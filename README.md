@@ -131,10 +131,9 @@ NEXT_PUBLIC_X_CLIENT_ID=your_x_client_id
 X_CLIENT_SECRET=your_x_client_secret
 NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
 TOKEN_ENCRYPTION_KEY=your_64_char_hex_key
-PORT=3001
 ```
 
-> **Important:** Set `NEXT_PUBLIC_APP_URL` to your Railway domain (e.g. `https://xmomentslater-production.up.railway.app`). This is used for OAuth callbacks and the bookmarklet iframe.
+> **Important:** Do **not** set a `PORT` variable — Railway assigns one automatically. Set `NEXT_PUBLIC_APP_URL` to your Railway domain (e.g. `https://xmomentslater-production.up.railway.app`). This is used for OAuth callbacks and the bookmarklet iframe.
 
 ### 3. Generate a Public Domain
 
