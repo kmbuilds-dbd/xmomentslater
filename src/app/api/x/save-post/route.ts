@@ -7,14 +7,45 @@ import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authenticate
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // 1. Authenticate — session cookie OR Bearer token (for iOS Shortcuts / API)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey
+    );
+
+    let userId: string;
+    const authHeader = request.headers.get("Authorization");
+
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token-based auth (iOS Shortcuts, external API clients)
+      const token = authHeader.slice(7);
+      const { data: feedToken } = await admin
+        .from("feed_tokens")
+        .select("user_id")
+        .eq("token", token)
+        .single();
+
+      if (!feedToken) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      userId = feedToken.user_id;
+    } else {
+      // Session-based auth (bookmarklet, web app)
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      userId = user.id;
     }
 
     // 2. Parse request body
@@ -35,26 +66,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Get user's X connection (encrypted tokens)
-    const { data: connection } = await supabase
+    const { data: connection } = await admin
       .from("x_connections")
       .select("access_token, refresh_token")
+      .eq("user_id", userId)
       .single();
 
     if (!connection) {
       return NextResponse.json({ error: "X account not connected" }, { status: 400 });
     }
-
-    // 5. Admin client (needed for token refresh + DB insert)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
-      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-    }
-
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey
-    );
 
     // 6. Fetch tweet — with automatic token refresh on 401
     let rawResponse;
@@ -62,7 +82,7 @@ export async function POST(request: NextRequest) {
       rawResponse = await fetchTweetWithRefresh({
         postId,
         connection,
-        userId: user.id,
+        userId: userId,
         admin,
       });
     } catch (err) {
@@ -96,7 +116,7 @@ export async function POST(request: NextRequest) {
     const { data: savedPost, error: dbError } = await admin
       .from("saved_posts")
       .insert({
-        user_id: user.id,
+        user_id: userId,
         x_post_id: postId,
         x_post_url: url,
         author_name: parsed.author,
