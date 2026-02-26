@@ -26,7 +26,7 @@ xMomentsLater fixes that. One-click save via bookmarklet, private library, clean
 | Database | Supabase (Postgres + Row-Level Security) |
 | Auth | Supabase Auth (email/password) + X OAuth 2.0 (PKCE) |
 | Token Security | AES-256-GCM encryption at rest |
-| Hosting | Vercel |
+| Hosting | Railway (or Vercel) |
 
 ## Getting Started
 
@@ -110,6 +110,65 @@ src/
     ├── bookmarklet.ts              # Bookmarklet code generator
     └── supabase/                   # Supabase client helpers
 ```
+
+## Deploying to Railway
+
+### 1. Create Railway Project
+
+1. Go to [railway.app](https://railway.app) and create a new project.
+2. Choose **Deploy from GitHub repo** and select `kmbuilds-dbd/xmomentslater`.
+3. Railway auto-detects Next.js — no Dockerfile needed.
+
+### 2. Set Environment Variables
+
+In Railway dashboard → your service → **Variables**, add:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+NEXT_PUBLIC_X_CLIENT_ID=your_x_client_id
+X_CLIENT_SECRET=your_x_client_secret
+NEXT_PUBLIC_APP_URL=https://your-app.up.railway.app
+TOKEN_ENCRYPTION_KEY=your_64_char_hex_key
+PORT=3001
+```
+
+> **Important:** Set `NEXT_PUBLIC_APP_URL` to your Railway domain (e.g. `https://xmomentslater-production.up.railway.app`). This is used for OAuth callbacks and the bookmarklet iframe.
+
+### 3. Generate a Public Domain
+
+In Railway dashboard → your service → **Settings** → **Networking** → **Generate Domain**. Copy the generated URL (e.g. `https://xmomentslater-production.up.railway.app`).
+
+Go back to **Variables** and set `NEXT_PUBLIC_APP_URL` to this domain. Redeploy.
+
+### 4. Update Supabase Auth Settings
+
+1. Go to your [Supabase dashboard](https://supabase.com/dashboard) → **Authentication** → **URL Configuration**.
+2. Set **Site URL** to your Railway domain:
+   ```
+   https://xmomentslater-production.up.railway.app
+   ```
+3. Add to **Redirect URLs**:
+   ```
+   https://xmomentslater-production.up.railway.app/auth/callback
+   ```
+
+### 5. Update X Developer Portal
+
+1. Go to [developer.x.com](https://developer.x.com) → your app → **Settings** → **User authentication settings**.
+2. Update the **Callback URI / Redirect URL** to:
+   ```
+   https://xmomentslater-production.up.railway.app/api/x/callback
+   ```
+3. Update the **Website URL** to your Railway domain.
+4. Make sure **OAuth 2.0** is enabled with the **PKCE** method.
+
+### 6. Verify
+
+1. Visit your Railway domain — you should see the landing page.
+2. Sign up, connect your X account — the OAuth flow should redirect back to your Railway URL.
+3. Install the bookmarklet, save a post, verify it works.
 
 ## License
 
