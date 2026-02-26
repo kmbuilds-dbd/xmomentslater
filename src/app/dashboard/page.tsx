@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { SavedPostCard } from "@/components/SavedPostCard";
+import { LibraryView } from "@/components/LibraryView";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 20;
 
 interface ParsedContent {
   blocks?: { type: string; content: string }[];
@@ -22,18 +24,80 @@ function getPreview(parsed: ParsedContent | null, raw?: any): string {
   return "";
 }
 
-export default async function DashboardPage() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function DashboardPage({ searchParams }: Props) {
+  const params = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch saved posts (newest first)
-  const { data: savedPosts } = await supabase
+  // Parse query params
+  const q = typeof params.q === "string" ? params.q.trim() : "";
+  const tag = typeof params.tag === "string" ? params.tag.trim() : "";
+  const sort = typeof params.sort === "string" ? params.sort : "saved_desc";
+  const page = Math.max(
+    1,
+    parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1
+  );
+
+  // Build query with count for pagination
+  let query = supabase
     .from("saved_posts")
-    .select("id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response")
-    .order("saved_at", { ascending: false })
-    .limit(50);
+    .select(
+      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response",
+      { count: "exact" }
+    );
+
+  // Search filter (author name or handle)
+  if (q) {
+    // Sanitize for PostgREST filter syntax — strip characters that could break .or()
+    const safeQ = q.replace(/[,()]/g, "");
+    if (safeQ) {
+      query = query.or(
+        `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%`
+      );
+    }
+  }
+
+  // Tag filter (posts containing this tag)
+  if (tag) {
+    query = query.contains("tags", [tag]);
+  }
+
+  // Sort order
+  if (sort === "unread") {
+    // Unread posts first (read_at IS NULL → NULLS FIRST), then by saved_at desc
+    query = query
+      .order("read_at", { ascending: true, nullsFirst: true })
+      .order("saved_at", { ascending: false });
+  } else {
+    // Default: newest saved first
+    query = query.order("saved_at", { ascending: false });
+  }
+
+  // Pagination
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+  query = query.range(from, to);
+
+  const { data: savedPosts, count } = await query;
+
+  // Fetch all user tags for the filter UI
+  const { data: tagRows } = await supabase
+    .from("saved_posts")
+    .select("tags");
+
+  const tagSet = new Set<string>();
+  for (const row of tagRows ?? []) {
+    for (const t of row.tags ?? []) {
+      tagSet.add(t);
+    }
+  }
+  const allTags = [...tagSet].sort();
 
   // Check if X is connected (for empty state message)
   const { data: xConnection } = await supabase
@@ -41,7 +105,24 @@ export default async function DashboardPage() {
     .select("x_handle")
     .single();
 
-  const posts = savedPosts ?? [];
+  // Transform posts for the client component
+  const posts = (savedPosts ?? []).map((post) => ({
+    id: post.id,
+    authorName: post.author_name,
+    authorHandle: post.author_handle,
+    postedAt: post.posted_at,
+    savedAt: post.saved_at,
+    readAt: post.read_at,
+    tags: post.tags ?? [],
+    xPostUrl: post.x_post_url,
+    preview: getPreview(
+      post.parsed_content as ParsedContent | null,
+      post.raw_api_response
+    ),
+  }));
+
+  const totalCount = count ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -52,38 +133,17 @@ export default async function DashboardPage() {
         {user?.email ? `Signed in as ${user.email}` : "Welcome"}
       </p>
 
-      {posts.length > 0 ? (
-        <div className="space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            {posts.length} saved post{posts.length !== 1 ? "s" : ""}
-          </p>
-          {posts.map((post) => (
-            <SavedPostCard
-              key={post.id}
-              id={post.id}
-              authorName={post.author_name}
-              authorHandle={post.author_handle}
-              postedAt={post.posted_at}
-              savedAt={post.saved_at}
-              readAt={post.read_at}
-              tags={post.tags ?? []}
-              xPostUrl={post.x_post_url}
-              preview={getPreview(post.parsed_content as ParsedContent | null, post.raw_api_response)}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed py-16 px-8 text-center">
-          <p className="font-[family-name:var(--font-fraunces)] text-lg text-muted-foreground mb-2">
-            No saved posts yet
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {xConnection
-              ? "Use the bookmarklet to save posts from X."
-              : "Connect your X account in Settings to get started."}
-          </p>
-        </div>
-      )}
+      <LibraryView
+        posts={posts}
+        allTags={allTags}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        currentPage={page}
+        currentSearch={q}
+        currentTag={tag}
+        currentSort={sort}
+        hasXConnection={!!xConnection}
+      />
     </main>
   );
 }
