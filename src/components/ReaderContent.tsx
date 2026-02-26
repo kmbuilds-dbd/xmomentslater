@@ -10,7 +10,7 @@ interface ParsedContent {
   handle: string;
   profileImageUrl?: string;
   date: string;
-  blocks: Array<{ type: "text" | "image"; content: string }>;
+  blocks: Array<{ type: "text" | "image" | "heading"; content: string }>;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -44,6 +44,13 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
+/** Detect whether a line is likely a heading (short, no sentence punctuation). */
+function isLikelyHeading(line: string): boolean {
+  if (line.length > 80 || line.length < 2) return false;
+  const lastChar = line.trim().slice(-1);
+  return ![".","!",";"].includes(lastChar);
+}
+
 /**
  * Extract content blocks from raw X API response as fallback
  * when parsed_content.blocks is empty.
@@ -55,12 +62,20 @@ function extractBlocksFromRaw(
   if (!raw?.data) return [];
   const blocks: ParsedContent["blocks"] = [];
 
-  // X Articles: article.plain_text has full content
+  // X Articles: parse plain_text into heading/paragraph blocks
   if (raw.data.article?.plain_text?.trim()) {
     if (raw.data.article.title?.trim()) {
-      blocks.push({ type: "text", content: raw.data.article.title.trim() });
+      blocks.push({ type: "heading", content: raw.data.article.title.trim() });
     }
-    blocks.push({ type: "text", content: raw.data.article.plain_text.trim() });
+    const lines = raw.data.article.plain_text.split("\n").filter((l: string) => l.trim());
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      blocks.push({
+        type: isLikelyHeading(trimmed) ? "heading" : "text",
+        content: trimmed,
+      });
+    }
     return blocks;
   }
 
@@ -180,11 +195,11 @@ export function ReaderContent({
           Library
         </Link>
 
-        {/* Author header */}
+        {/* Author byline */}
         <header className="mb-8 pb-6 border-b">
-          <h1 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-tight mb-2">
+          <p className="font-medium text-base mb-1">
             {displayName}
-          </h1>
+          </p>
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
             {authorHandle && <span>@{authorHandle}</span>}
             {postedAt && (
@@ -261,6 +276,25 @@ export function ReaderContent({
             </div>
           )}
           {blocks.map((block, i) => {
+            if (block.type === "heading") {
+              // First heading = article title (h1), rest = section headings (h2)
+              const isTitle = i === 0;
+              return isTitle ? (
+                <h1
+                  key={i}
+                  className="font-[family-name:var(--font-fraunces)] text-3xl font-bold tracking-tight mt-2 mb-4"
+                >
+                  {block.content}
+                </h1>
+              ) : (
+                <h2
+                  key={i}
+                  className="font-[family-name:var(--font-fraunces)] text-xl font-semibold tracking-tight mt-10 mb-3"
+                >
+                  {block.content}
+                </h2>
+              );
+            }
             if (block.type === "text") {
               return (
                 <p key={i} className="whitespace-pre-wrap">

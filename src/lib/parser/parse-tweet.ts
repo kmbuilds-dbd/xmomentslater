@@ -1,27 +1,64 @@
 import type { XApiTweetResponse } from "./fetch-tweet";
 
+export type BlockType = "text" | "image" | "heading";
+
 export interface ParsedContent {
   author: string;
   handle: string;
   profileImageUrl?: string;
   date: string;
-  blocks: Array<{ type: "text" | "image"; content: string }>;
+  blocks: Array<{ type: BlockType; content: string }>;
+}
+
+/**
+ * Detect whether a line from article plain_text is likely a heading.
+ * Headings are short lines that don't end with sentence punctuation.
+ */
+function isLikelyHeading(line: string): boolean {
+  if (line.length > 80 || line.length < 2) return false;
+  const lastChar = line.trim().slice(-1);
+  // Sentence-ending punctuation → paragraph, not heading
+  return ![".","!",";"].includes(lastChar);
+}
+
+/**
+ * Parse X Article plain_text into structured heading + paragraph blocks.
+ */
+function parseArticleBlocks(
+  plainText: string,
+  title?: string
+): ParsedContent["blocks"] {
+  const blocks: ParsedContent["blocks"] = [];
+
+  if (title?.trim()) {
+    blocks.push({ type: "heading", content: title.trim() });
+  }
+
+  const lines = plainText.split("\n").filter((l) => l.trim());
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (isLikelyHeading(trimmed)) {
+      blocks.push({ type: "heading", content: trimmed });
+    } else {
+      blocks.push({ type: "text", content: trimmed });
+    }
+  }
+
+  return blocks;
 }
 
 export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   const author = raw.includes?.users?.find((u) => u.id === raw.data.author_id);
   const article = raw.data.article;
 
-  const blocks: ParsedContent["blocks"] = [];
+  let blocks: ParsedContent["blocks"] = [];
 
-  // X Articles: use article.plain_text (full article content) when available
+  // X Articles: parse plain_text into structured heading/paragraph blocks
   if (article?.plain_text?.trim()) {
-    // Article title as a separate block if present
-    if (article.title?.trim()) {
-      blocks.push({ type: "text", content: article.title.trim() });
-    }
-    blocks.push({ type: "text", content: article.plain_text.trim() });
-    // Note: article.cover_media is a media key string, not a URL — skip it
+    blocks = parseArticleBlocks(article.plain_text, article.title);
   } else {
     // Regular tweets / X Notes: use note_tweet.text or data.text
     const originalText = raw.data.note_tweet?.text ?? raw.data.text ?? "";
