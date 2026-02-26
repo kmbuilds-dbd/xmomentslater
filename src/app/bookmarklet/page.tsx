@@ -69,7 +69,14 @@ function BookmarkletContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url, tags: selectedTags }),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        setErrorMsg(`Server error (${res.status})`);
+        setStatus("error");
+        return;
+      }
       if (!res.ok) {
         setErrorMsg(data.error ?? "Failed to save");
         setStatus("error");
@@ -80,8 +87,8 @@ function BookmarkletContent() {
       setTimeout(() => {
         window.close();
       }, 1500);
-    } catch {
-      setErrorMsg("Network error");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Network error");
       setStatus("error");
     }
   };
