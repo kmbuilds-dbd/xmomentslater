@@ -133,8 +133,10 @@ NEXT_PUBLIC_APP_URL               # App base URL (default: http://localhost:3001
 TOKEN_ENCRYPTION_KEY              # 32-byte hex string for AES-256-GCM token encryption
 ```
 
-Also stored in `.env.local` but not used in OAuth flow yet:
-- `X_CONSUMER_KEY` / `X_CONSUMER_SECRET` / `X_BEARER_TOKEN` — for future X API v1.1/v2 calls
+Also in `.env.local`:
+- `X_CONSUMER_KEY` / `X_CONSUMER_SECRET` — X API v1.1 credentials
+- `X_BEARER_TOKEN` — App bearer token for X API v2 (required for article content fetching)
+- `ALLOWED_SIGNUP_EMAILS` — Comma-separated whitelist of emails allowed to sign up (empty = open signup)
 
 `NEXT_PUBLIC_*` vars are baked in at build time. `@/*` path alias maps to `./src/*`.
 

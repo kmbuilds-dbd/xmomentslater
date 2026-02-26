@@ -37,12 +37,21 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        // Server-side whitelist check + admin user creation
+        const res = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Signup failed");
+        }
+
+        // Sign in with the newly created credentials
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
-          },
         });
         if (error) throw error;
         router.push("/dashboard");

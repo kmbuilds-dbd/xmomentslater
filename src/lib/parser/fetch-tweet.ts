@@ -17,9 +17,9 @@ export interface XApiTweetResponse {
     };
     article?: {
       title?: string;
-      text?: string;
-      description?: string;
-      cover_media?: { url?: string };
+      plain_text?: string;
+      preview_text?: string;
+      cover_media?: string; // media key string, not URL
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       [key: string]: any;
     };
@@ -73,17 +73,18 @@ export async function fetchTweet(
 ): Promise<XApiTweetResponse> {
   const result = await fetchWithToken(postId, accessToken);
 
-  // If no article field returned and app bearer token is available, retry
+  // If no article content returned and app bearer token is available, retry
+  // (article field requires app-level auth, not user OAuth)
   const bearerToken = process.env.X_BEARER_TOKEN;
-  if (!result.data.article && bearerToken) {
+  if (!result.data.article?.plain_text && bearerToken) {
     try {
       const retried = await fetchWithToken(postId, bearerToken);
-      if (retried.data.article) {
+      if (retried.data.article?.plain_text) {
         // Merge: use article from bearer response, keep rest from user response
         result.data.article = retried.data.article;
       }
-    } catch {
-      // Bearer retry failed — use original result
+    } catch (err) {
+      console.error("Bearer token retry failed for article content:", err);
     }
   }
 

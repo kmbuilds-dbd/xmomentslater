@@ -55,15 +55,12 @@ function extractBlocksFromRaw(
   if (!raw?.data) return [];
   const blocks: ParsedContent["blocks"] = [];
 
-  // X Articles: article.text has full content
-  if (raw.data.article?.text?.trim()) {
+  // X Articles: article.plain_text has full content
+  if (raw.data.article?.plain_text?.trim()) {
     if (raw.data.article.title?.trim()) {
       blocks.push({ type: "text", content: raw.data.article.title.trim() });
     }
-    blocks.push({ type: "text", content: raw.data.article.text.trim() });
-    if (raw.data.article.cover_media?.url) {
-      blocks.push({ type: "image", content: raw.data.article.cover_media.url });
-    }
+    blocks.push({ type: "text", content: raw.data.article.plain_text.trim() });
     return blocks;
   }
 

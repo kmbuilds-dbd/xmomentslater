@@ -14,18 +14,14 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
 
   const blocks: ParsedContent["blocks"] = [];
 
-  // X Articles: use article.text (full article content) when available
-  if (article?.text?.trim()) {
+  // X Articles: use article.plain_text (full article content) when available
+  if (article?.plain_text?.trim()) {
     // Article title as a separate block if present
     if (article.title?.trim()) {
       blocks.push({ type: "text", content: article.title.trim() });
     }
-    blocks.push({ type: "text", content: article.text.trim() });
-
-    // Article cover image
-    if (article.cover_media?.url) {
-      blocks.push({ type: "image", content: article.cover_media.url });
-    }
+    blocks.push({ type: "text", content: article.plain_text.trim() });
+    // Note: article.cover_media is a media key string, not a URL — skip it
   } else {
     // Regular tweets / X Notes: use note_tweet.text or data.text
     const originalText = raw.data.note_tweet?.text ?? raw.data.text ?? "";
