@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { BookOpen, Trash2, ExternalLink } from "lucide-react";
 
 interface SavedPostCardProps {
@@ -63,23 +64,25 @@ export function SavedPostCard({
         isRead ? "opacity-60" : ""
       }`}
     >
-      {/* Author + time */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <p className="text-sm font-medium truncate">
-          {displayName}
-        </p>
-        {authorHandle && (
-          <span className="text-xs text-muted-foreground">@{authorHandle}</span>
-        )}
-        <span className="text-xs text-muted-foreground ml-auto shrink-0">
-          {timeAgo}
-        </span>
-      </div>
+      <Link href={`/dashboard/reader/${id}`} className="block group">
+        {/* Author + time */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+            {displayName}
+          </p>
+          {authorHandle && (
+            <span className="text-xs text-muted-foreground">@{authorHandle}</span>
+          )}
+          <span className="text-xs text-muted-foreground ml-auto shrink-0">
+            {timeAgo}
+          </span>
+        </div>
 
-      {/* Content preview */}
-      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-        {preview}
-      </p>
+        {/* Content preview */}
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+          {preview}
+        </p>
+      </Link>
 
       {/* Tags */}
       {tags.length > 0 && (
