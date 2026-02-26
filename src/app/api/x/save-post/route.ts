@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { decrypt } from "@/lib/encryption";
-import { extractPostId, fetchTweet, parseTweet } from "@/lib/parser";
+import { extractPostId, extractArticleId, fetchTweet, parseTweet } from "@/lib/parser";
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,7 +56,35 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. Parse into structured content
-    const parsed = parseTweet(rawResponse);
+    let parsed = parseTweet(rawResponse);
+
+    // 7b. If the tweet text is just an X Article/Note URL, fetch the article content
+    const textBlock = parsed.blocks.find((b) => b.type === "text");
+    const articleId = textBlock ? extractArticleId(textBlock.content) : null;
+    if (articleId && parsed.blocks.filter((b) => b.type === "text").length === 1) {
+      try {
+        const articleRaw = await fetchTweet(articleId, accessToken);
+        const articleParsed = parseTweet(articleRaw);
+        // Only use article content if it has meaningful text (not just another URL)
+        if (
+          articleParsed.blocks.length > 0 &&
+          articleParsed.blocks.some(
+            (b) => b.type === "text" && !extractArticleId(b.content)
+          )
+        ) {
+          // Merge: use article's text blocks but keep original author metadata
+          parsed = {
+            ...parsed,
+            blocks: articleParsed.blocks,
+          };
+          // Also store the article raw response
+          rawResponse = { ...rawResponse, _article: articleRaw };
+        }
+      } catch (err) {
+        // Article fetch failed — keep original parsed content
+        console.error("Article content fetch failed:", err);
+      }
+    }
 
     // 8. Store in database (admin client to bypass RLS for insert)
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

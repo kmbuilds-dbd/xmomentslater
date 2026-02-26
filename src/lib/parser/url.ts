@@ -17,3 +17,16 @@ export function extractPostId(url: string): string | null {
     return null;
   }
 }
+
+/**
+ * Extract article/note ID from an X article URL found in tweet text.
+ * Handles: x.com/i/article/{id}, twitter.com/i/article/{id}
+ * Returns null if not an article URL.
+ */
+export function extractArticleId(text: string): string | null {
+  // Match article URLs in text (may be http or https, with or without www)
+  const match = text.match(
+    /https?:\/\/(?:www\.)?(?:x\.com|twitter\.com)\/i\/article\/(\d+)/
+  );
+  return match ? match[1] : null;
+}

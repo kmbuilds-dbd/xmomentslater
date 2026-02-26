@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, ExternalLink, Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ExternalLink, Clock, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 interface ParsedContent {
@@ -46,25 +47,30 @@ function formatDate(dateStr: string | null): string {
 /**
  * Extract content blocks from raw X API response as fallback
  * when parsed_content.blocks is empty.
+ * Checks for nested _article response (X Articles fetched during save).
  */
 function extractBlocksFromRaw(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw: any
 ): ParsedContent["blocks"] {
   if (!raw?.data) return [];
+
+  // If an article sub-response exists, prefer its content
+  const source = raw._article?.data ? raw._article : raw;
   const blocks: ParsedContent["blocks"] = [];
 
   // Prefer note_tweet.text (long posts / X Notes), fall back to data.text
-  const text = raw.data.note_tweet?.text ?? raw.data.text;
+  const text = source.data.note_tweet?.text ?? source.data.text;
   if (text?.trim()) {
     blocks.push({ type: "text", content: text.trim() });
   }
 
   // Extract images from media includes
-  if (raw.includes?.media) {
-    for (const media of raw.includes.media) {
-      if (media.type === "photo" && media.url) {
-        blocks.push({ type: "image", content: media.url });
+  const media = source.includes?.media ?? raw.includes?.media;
+  if (media) {
+    for (const m of media) {
+      if (m.type === "photo" && m.url) {
+        blocks.push({ type: "image", content: m.url });
       }
     }
   }
@@ -72,7 +78,16 @@ function extractBlocksFromRaw(
   return blocks;
 }
 
+/** Check if content blocks are just a URL (no real text) */
+function isContentJustUrl(blocks: ParsedContent["blocks"]): boolean {
+  const textBlocks = blocks.filter((b) => b.type === "text");
+  if (textBlocks.length !== 1) return false;
+  const text = textBlocks[0].content.trim();
+  return /^https?:\/\/\S+$/.test(text);
+}
+
 export function ReaderContent({
+  postId,
   authorName,
   authorHandle,
   postedAt,
@@ -81,7 +96,9 @@ export function ReaderContent({
   parsedContent,
   rawApiResponse,
 }: ReaderContentProps) {
+  const router = useRouter();
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -104,6 +121,25 @@ export function ReaderContent({
       : extractBlocksFromRaw(rawApiResponse);
   const readTime = estimateReadTime(blocks);
   const displayName = authorName || authorHandle || "Unknown";
+  const needsRefresh = blocks.length === 0 || isContentJustUrl(blocks);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/posts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: postId }),
+      });
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch {
+      // Refresh failed silently
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
@@ -171,6 +207,21 @@ export function ReaderContent({
 
         {/* Content blocks */}
         <article className="font-[family-name:var(--font-newsreader)] text-lg leading-relaxed space-y-6">
+          {needsRefresh && (
+            <div className="rounded-lg border border-dashed py-8 px-6 text-center font-sans">
+              <p className="text-muted-foreground mb-3 text-sm">
+                This post links to an X Article. Click refresh to fetch the full content.
+              </p>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Fetching…" : "Refresh content"}
+              </button>
+            </div>
+          )}
           {blocks.map((block, i) => {
             if (block.type === "text") {
               return (
