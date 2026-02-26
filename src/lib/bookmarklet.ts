@@ -1,0 +1,3 @@
+export function getBookmarkletCode(appUrl: string): string {
+  return `javascript:void((function(){var e=document.getElementById('xml-bookmarklet');if(e){e.remove();return;}var d=document,f=d.createElement('iframe');f.id='xml-bookmarklet';f.src='${appUrl}/bookmarklet?url='+encodeURIComponent(d.location.href);f.style.cssText='position:fixed;top:16px;right:16px;width:340px;height:320px;border:none;border-radius:12px;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,.25)';d.body.appendChild(f);window.addEventListener('message',function h(ev){if(ev.data&&ev.data.type==='xml-bookmarklet-close'){f.remove();window.removeEventListener('message',h);}});})())`;
+}
