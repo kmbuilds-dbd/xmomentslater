@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { X, Check, Plus, Loader2 } from "lucide-react";
+import { X, Check, Loader2 } from "lucide-react";
 
 type Status = "idle" | "loading" | "saving" | "saved" | "error";
 
@@ -15,6 +15,10 @@ function BookmarkletContent() {
   const [newTag, setNewTag] = useState("");
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch existing tags on mount
   useEffect(() => {
@@ -36,28 +40,61 @@ function BookmarkletContent() {
       .catch(() => setStatus("idle"));
   }, []);
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
+  // Filter suggestions: match input, exclude already-selected
+  const query = newTag.trim().toLowerCase();
+  const suggestions = query
+    ? existingTags.filter(
+        (t) => t.includes(query) && !selectedTags.includes(t)
+      )
+    : [];
 
-  const addNewTag = () => {
-    const tag = newTag.trim().toLowerCase();
-    if (!tag) return;
-    if (!selectedTags.includes(tag)) {
-      setSelectedTags((prev) => [...prev, tag]);
+  const addTag = (tag: string) => {
+    const normalized = tag.trim().toLowerCase();
+    if (!normalized) return;
+    if (!selectedTags.includes(normalized)) {
+      setSelectedTags((prev) => [...prev, normalized]);
     }
-    if (!existingTags.includes(tag)) {
-      setExistingTags((prev) => [...prev, tag]);
+    if (!existingTags.includes(normalized)) {
+      setExistingTags((prev) => [...prev, normalized]);
     }
     setNewTag("");
+    setShowDropdown(false);
+    setHighlightedIndex(-1);
+    inputRef.current?.focus();
+  };
+
+  const removeTag = (tag: string) => {
+    setSelectedTags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setNewTag(e.target.value);
+    setShowDropdown(true);
+    setHighlightedIndex(-1);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === ",") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      addNewTag();
+      setHighlightedIndex((prev) =>
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) =>
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      );
+    } else if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (highlightedIndex >= 0 && suggestions[highlightedIndex]) {
+        addTag(suggestions[highlightedIndex]);
+      } else if (query) {
+        addTag(query);
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+    } else if (e.key === "Backspace" && !newTag && selectedTags.length > 0) {
+      removeTag(selectedTags[selectedTags.length - 1]);
     }
   };
 
@@ -83,7 +120,6 @@ function BookmarkletContent() {
         return;
       }
       setStatus("saved");
-      // Auto-dismiss after 1.5s
       setTimeout(() => {
         window.close();
       }, 1500);
@@ -122,46 +158,84 @@ function BookmarkletContent() {
       {/* URL preview */}
       <p className="text-xs text-muted-foreground truncate mb-3">{url}</p>
 
-      {/* Tag chips */}
       {status === "loading" ? (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-1.5 mb-3 max-h-24 overflow-y-auto">
-            {existingTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                  selectedTags.includes(tag)
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
+          {/* Selected tags as removable chips */}
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary text-primary-foreground"
+                >
+                  {tag}
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="hover:opacity-70"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-          {/* New tag input */}
-          <div className="flex items-center gap-2 mb-3">
+          {/* Tag input with typeahead dropdown */}
+          <div className="relative mb-3">
             <input
+              ref={inputRef}
               type="text"
               value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onFocus={() => query && setShowDropdown(true)}
+              onBlur={() => {
+                // Delay to allow click on dropdown item
+                setTimeout(() => setShowDropdown(false), 150);
+              }}
               placeholder="Add tag..."
-              className="flex-1 text-xs px-3 py-1.5 rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full text-xs px-3 py-2 rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
             />
-            <button
-              onClick={addNewTag}
-              disabled={!newTag.trim()}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
+
+            {/* Dropdown */}
+            {showDropdown && suggestions.length > 0 && (
+              <div
+                ref={dropdownRef}
+                className="absolute left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-lg overflow-hidden z-50"
+              >
+                {suggestions.slice(0, 6).map((tag, i) => (
+                  <button
+                    key={tag}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => addTag(tag)}
+                    className={`w-full text-left text-xs px-3 py-1.5 transition-colors ${
+                      i === highlightedIndex
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent/50"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* "Create new" hint when typing something not in existing */}
+            {showDropdown && query && !existingTags.includes(query) && suggestions.length === 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-lg overflow-hidden z-50">
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => addTag(query)}
+                  className="w-full text-left text-xs px-3 py-1.5 hover:bg-accent/50 text-muted-foreground"
+                >
+                  Create &ldquo;{query}&rdquo;
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
