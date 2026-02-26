@@ -78,7 +78,7 @@ function BookmarkletContent() {
       setStatus("saved");
       // Auto-dismiss after 1.5s
       setTimeout(() => {
-        window.parent.postMessage({ type: "xml-bookmarklet-close" }, "*");
+        window.close();
       }, 1500);
     } catch {
       setErrorMsg("Network error");
@@ -87,7 +87,7 @@ function BookmarkletContent() {
   };
 
   const handleClose = () => {
-    window.parent.postMessage({ type: "xml-bookmarklet-close" }, "*");
+    window.close();
   };
 
   // Saved confirmation
