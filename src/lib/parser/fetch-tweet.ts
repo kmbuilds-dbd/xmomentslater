@@ -33,16 +33,25 @@ export interface XApiTweetResponse {
 
 const X_TWEETS_URL = "https://api.x.com/2/tweets";
 
-export async function fetchTweet(postId: string, accessToken: string): Promise<XApiTweetResponse> {
-  const params = new URLSearchParams({
-    "tweet.fields": "text,created_at,author_id,entities,note_tweet,attachments,article",
+const TWEET_FIELDS =
+  "text,created_at,author_id,entities,note_tweet,attachments,article";
+
+function buildParams(): URLSearchParams {
+  return new URLSearchParams({
+    "tweet.fields": TWEET_FIELDS,
     expansions: "author_id,attachments.media_keys",
     "user.fields": "name,username,profile_image_url",
     "media.fields": "url,preview_image_url,type,width,height",
   });
+}
 
+async function fetchWithToken(
+  postId: string,
+  token: string
+): Promise<XApiTweetResponse> {
+  const params = buildParams();
   const res = await fetch(`${X_TWEETS_URL}/${postId}?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!res.ok) {
@@ -51,4 +60,32 @@ export async function fetchTweet(postId: string, accessToken: string): Promise<X
   }
 
   return res.json();
+}
+
+/**
+ * Fetch tweet from X API v2. Uses the user's OAuth token first,
+ * then retries with the app bearer token if the article field is missing
+ * (article field requires app-level auth).
+ */
+export async function fetchTweet(
+  postId: string,
+  accessToken: string
+): Promise<XApiTweetResponse> {
+  const result = await fetchWithToken(postId, accessToken);
+
+  // If no article field returned and app bearer token is available, retry
+  const bearerToken = process.env.X_BEARER_TOKEN;
+  if (!result.data.article && bearerToken) {
+    try {
+      const retried = await fetchWithToken(postId, bearerToken);
+      if (retried.data.article) {
+        // Merge: use article from bearer response, keep rest from user response
+        result.data.article = retried.data.article;
+      }
+    } catch {
+      // Bearer retry failed — use original result
+    }
+  }
+
+  return result;
 }
