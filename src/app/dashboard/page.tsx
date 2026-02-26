@@ -3,9 +3,20 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { XConnectionCard } from "@/components/XConnectionCard";
 import { FeedUrlCard } from "@/components/FeedUrlCard";
 import { BookmarkletButton } from "@/components/BookmarkletButton";
+import { SavedPostCard } from "@/components/SavedPostCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
 
 export const dynamic = "force-dynamic";
+
+interface ParsedContent {
+  blocks?: { type: string; content: string }[];
+}
+
+function getPreview(parsed: ParsedContent | null): string {
+  if (!parsed?.blocks) return "";
+  const textBlock = parsed.blocks.find((b) => b.type === "text");
+  return textBlock?.content?.slice(0, 200) ?? "";
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,6 +29,13 @@ export default async function DashboardPage() {
     .from("x_connections")
     .select("x_handle")
     .single();
+
+  // Fetch saved posts (newest first)
+  const { data: savedPosts } = await supabase
+    .from("saved_posts")
+    .select("id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content")
+    .order("saved_at", { ascending: false })
+    .limit(50);
 
   // Fetch or create feed token
   let feedToken: string | null = null;
@@ -46,6 +64,8 @@ export default async function DashboardPage() {
       console.error("Feed token error:", err);
     }
   }
+
+  const posts = savedPosts ?? [];
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -76,16 +96,39 @@ export default async function DashboardPage() {
         />
       )}
 
-      <div className="rounded-lg border border-dashed py-16 px-8 text-center">
-        <p className="font-[family-name:var(--font-fraunces)] text-lg text-muted-foreground mb-2">
-          No saved posts yet
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {xConnection
-            ? "Use the bookmarklet to save posts from X."
-            : "Connect your X account above to get started."}
-        </p>
-      </div>
+      {/* Saved posts */}
+      {posts.length > 0 ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-muted-foreground">
+            {posts.length} saved post{posts.length !== 1 ? "s" : ""}
+          </p>
+          {posts.map((post) => (
+            <SavedPostCard
+              key={post.id}
+              id={post.id}
+              authorName={post.author_name}
+              authorHandle={post.author_handle}
+              postedAt={post.posted_at}
+              savedAt={post.saved_at}
+              readAt={post.read_at}
+              tags={post.tags ?? []}
+              xPostUrl={post.x_post_url}
+              preview={getPreview(post.parsed_content as ParsedContent | null)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed py-16 px-8 text-center">
+          <p className="font-[family-name:var(--font-fraunces)] text-lg text-muted-foreground mb-2">
+            No saved posts yet
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {xConnection
+              ? "Use the bookmarklet to save posts from X."
+              : "Connect your X account above to get started."}
+          </p>
+        </div>
+      )}
     </main>
   );
 }
