@@ -47,28 +47,35 @@ function formatDate(dateStr: string | null): string {
 /**
  * Extract content blocks from raw X API response as fallback
  * when parsed_content.blocks is empty.
- * Checks for nested _article response (X Articles fetched during save).
  */
 function extractBlocksFromRaw(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   raw: any
 ): ParsedContent["blocks"] {
   if (!raw?.data) return [];
-
-  // If an article sub-response exists, prefer its content
-  const source = raw._article?.data ? raw._article : raw;
   const blocks: ParsedContent["blocks"] = [];
 
-  // Prefer note_tweet.text (long posts / X Notes), fall back to data.text
-  const text = source.data.note_tweet?.text ?? source.data.text;
+  // X Articles: article.text has full content
+  if (raw.data.article?.text?.trim()) {
+    if (raw.data.article.title?.trim()) {
+      blocks.push({ type: "text", content: raw.data.article.title.trim() });
+    }
+    blocks.push({ type: "text", content: raw.data.article.text.trim() });
+    if (raw.data.article.cover_media?.url) {
+      blocks.push({ type: "image", content: raw.data.article.cover_media.url });
+    }
+    return blocks;
+  }
+
+  // Regular tweets / X Notes
+  const text = raw.data.note_tweet?.text ?? raw.data.text;
   if (text?.trim()) {
     blocks.push({ type: "text", content: text.trim() });
   }
 
-  // Extract images from media includes
-  const media = source.includes?.media ?? raw.includes?.media;
-  if (media) {
-    for (const m of media) {
+  // Media
+  if (raw.includes?.media) {
+    for (const m of raw.includes.media) {
       if (m.type === "photo" && m.url) {
         blocks.push({ type: "image", content: m.url });
       }

@@ -15,6 +15,14 @@ export interface XApiTweetResponse {
         mentions?: Array<{ start: number; end: number; username: string }>;
       };
     };
+    article?: {
+      title?: string;
+      text?: string;
+      description?: string;
+      cover_media?: { url?: string };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      [key: string]: any;
+    };
     attachments?: { media_keys?: string[] };
   };
   includes?: {
@@ -27,7 +35,7 @@ const X_TWEETS_URL = "https://api.x.com/2/tweets";
 
 export async function fetchTweet(postId: string, accessToken: string): Promise<XApiTweetResponse> {
   const params = new URLSearchParams({
-    "tweet.fields": "text,created_at,author_id,entities,note_tweet,attachments",
+    "tweet.fields": "text,created_at,author_id,entities,note_tweet,attachments,article",
     expansions: "author_id,attachments.media_keys",
     "user.fields": "name,username,profile_image_url",
     "media.fields": "url,preview_image_url,type,width,height",

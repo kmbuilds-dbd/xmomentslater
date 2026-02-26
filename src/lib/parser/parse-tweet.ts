@@ -10,41 +10,53 @@ export interface ParsedContent {
 
 export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   const author = raw.includes?.users?.find((u) => u.id === raw.data.author_id);
-
-  // Prefer note_tweet.text for long posts / X Notes, fall back to data.text
-  const originalText = raw.data.note_tweet?.text ?? raw.data.text ?? "";
-  let text = originalText;
-
-  // Resolve shortened URLs in text
-  try {
-    const entities = raw.data.note_tweet?.entities ?? raw.data.entities;
-    if (entities?.urls) {
-      // Replace from end to start so indices stay valid
-      const sorted = [...entities.urls].sort((a, b) => b.start - a.start);
-      for (const urlEntity of sorted) {
-        if (
-          typeof urlEntity.start === "number" &&
-          typeof urlEntity.end === "number" &&
-          urlEntity.expanded_url
-        ) {
-          text =
-            text.slice(0, urlEntity.start) +
-            urlEntity.expanded_url +
-            text.slice(urlEntity.end);
-        }
-      }
-    }
-  } catch {
-    // If URL resolution fails, use the original unprocessed text
-    text = originalText;
-  }
+  const article = raw.data.article;
 
   const blocks: ParsedContent["blocks"] = [];
 
-  // Text block — use original text as final fallback
-  const finalText = text.trim() || originalText.trim();
-  if (finalText) {
-    blocks.push({ type: "text", content: finalText });
+  // X Articles: use article.text (full article content) when available
+  if (article?.text?.trim()) {
+    // Article title as a separate block if present
+    if (article.title?.trim()) {
+      blocks.push({ type: "text", content: article.title.trim() });
+    }
+    blocks.push({ type: "text", content: article.text.trim() });
+
+    // Article cover image
+    if (article.cover_media?.url) {
+      blocks.push({ type: "image", content: article.cover_media.url });
+    }
+  } else {
+    // Regular tweets / X Notes: use note_tweet.text or data.text
+    const originalText = raw.data.note_tweet?.text ?? raw.data.text ?? "";
+    let text = originalText;
+
+    // Resolve shortened URLs in text
+    try {
+      const entities = raw.data.note_tweet?.entities ?? raw.data.entities;
+      if (entities?.urls) {
+        const sorted = [...entities.urls].sort((a, b) => b.start - a.start);
+        for (const urlEntity of sorted) {
+          if (
+            typeof urlEntity.start === "number" &&
+            typeof urlEntity.end === "number" &&
+            urlEntity.expanded_url
+          ) {
+            text =
+              text.slice(0, urlEntity.start) +
+              urlEntity.expanded_url +
+              text.slice(urlEntity.end);
+          }
+        }
+      }
+    } catch {
+      text = originalText;
+    }
+
+    const finalText = text.trim() || originalText.trim();
+    if (finalText) {
+      blocks.push({ type: "text", content: finalText });
+    }
   }
 
   // Image blocks from media attachments

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { decrypt } from "@/lib/encryption";
-import { extractArticleId, fetchTweet, parseTweet } from "@/lib/parser";
+import { fetchTweet, parseTweet } from "@/lib/parser";
 
 // PATCH — mark read / unread
 export async function PATCH(request: NextRequest) {
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest) {
 
     const accessToken = decrypt(connection.access_token);
 
-    // Re-fetch from X API
+    // Re-fetch from X API (now includes article field)
     let rawResponse;
     try {
       rawResponse = await fetchTweet(post.x_post_id, accessToken);
@@ -99,32 +99,8 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch post from X" }, { status: 502 });
     }
 
-    // Re-parse
-    let parsed = parseTweet(rawResponse);
-
-    // Check for article content
-    const textBlock = parsed.blocks.find((b) => b.type === "text");
-    const articleId = textBlock ? extractArticleId(textBlock.content) : null;
-    console.log("Re-fetch: text =", textBlock?.content?.slice(0, 100), "| articleId =", articleId);
-    if (articleId && parsed.blocks.filter((b) => b.type === "text").length === 1) {
-      try {
-        console.log("Fetching article content for ID:", articleId);
-        const articleRaw = await fetchTweet(articleId, accessToken);
-        const articleParsed = parseTweet(articleRaw);
-        console.log("Article parsed blocks:", articleParsed.blocks.length, "| first text:", articleParsed.blocks.find(b => b.type === "text")?.content?.slice(0, 100));
-        if (
-          articleParsed.blocks.length > 0 &&
-          articleParsed.blocks.some(
-            (b) => b.type === "text" && !extractArticleId(b.content)
-          )
-        ) {
-          parsed = { ...parsed, blocks: articleParsed.blocks };
-          rawResponse = { ...rawResponse, _article: articleRaw };
-        }
-      } catch (err) {
-        console.error("Article re-fetch failed:", err);
-      }
-    }
+    // Re-parse (article field in tweet.fields handles X Articles automatically)
+    const parsed = parseTweet(rawResponse);
 
     // Update in database
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
