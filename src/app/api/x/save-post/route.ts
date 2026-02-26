@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { decrypt } from "@/lib/encryption";
-import { extractPostId, fetchTweet, parseTweet } from "@/lib/parser";
+import { decrypt, encrypt } from "@/lib/encryption";
+import { extractPostId, fetchTweet, XApiError, parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import { refreshAccessToken } from "@/lib/x-api/oauth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,16 +45,57 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "X account not connected" }, { status: 400 });
     }
 
-    // 5. Decrypt access token
-    const accessToken = decrypt(connection.access_token);
+    // 5. Admin client (needed for token refresh + DB insert)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
 
-    // 6. Fetch tweet from X API
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey
+    );
+
+    // 6. Fetch tweet — with automatic token refresh on 401
+    let accessToken = decrypt(connection.access_token);
     let rawResponse;
     try {
       rawResponse = await fetchTweet(postId, accessToken);
     } catch (err) {
-      console.error("X API fetch error:", err);
-      return NextResponse.json({ error: "Failed to fetch post from X" }, { status: 502 });
+      // If token expired (401), refresh and retry once
+      if (err instanceof XApiError && err.status === 401) {
+        console.log("Access token expired, refreshing...");
+        try {
+          const refreshToken = decrypt(connection.refresh_token);
+          const newTokens = await refreshAccessToken(refreshToken);
+          accessToken = newTokens.access_token;
+
+          // Store refreshed tokens
+          await admin
+            .from("x_connections")
+            .update({
+              access_token: encrypt(newTokens.access_token),
+              refresh_token: encrypt(newTokens.refresh_token),
+              token_expires_at: new Date(
+                Date.now() + newTokens.expires_in * 1000
+              ).toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", user.id);
+
+          rawResponse = await fetchTweet(postId, accessToken);
+        } catch (refreshErr) {
+          console.error("Token refresh failed:", refreshErr);
+          return NextResponse.json(
+            { error: "X session expired. Please reconnect your X account in Settings." },
+            { status: 401 }
+          );
+        }
+      } else {
+        console.error("X API fetch error:", err);
+        return NextResponse.json({ error: "Failed to fetch post from X" }, { status: 502 });
+      }
     }
 
     // 7. Parse into structured content (article field handles X Articles automatically)
@@ -73,18 +115,7 @@ export async function POST(request: NextRequest) {
       console.error("Summary generation failed:", err);
     }
 
-    // 9. Store in database (admin client to bypass RLS for insert)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
-      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-    }
-
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey
-    );
-
+    // 9. Store in database
     const { data: savedPost, error: dbError } = await admin
       .from("saved_posts")
       .insert({

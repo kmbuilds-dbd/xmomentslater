@@ -71,6 +71,48 @@ export async function exchangeCodeForTokens(params: {
   return res.json();
 }
 
+/**
+ * Use a refresh token to obtain a new access token from X.
+ * Returns fresh access_token, refresh_token, and expires_in.
+ */
+export async function refreshAccessToken(refreshToken: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}> {
+  const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+  const clientSecret = process.env.X_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing X OAuth credentials for token refresh");
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString(
+    "base64"
+  );
+
+  const res = await fetch(X_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basicAuth}`,
+    },
+    body: body.toString(),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Token refresh failed (${res.status}): ${err}`);
+  }
+
+  return res.json();
+}
+
 export async function fetchXUser(accessToken: string): Promise<{
   id: string;
   name: string;

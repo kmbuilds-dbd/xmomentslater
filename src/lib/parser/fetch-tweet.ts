@@ -31,6 +31,15 @@ export interface XApiTweetResponse {
   };
 }
 
+/** Typed error from X API with HTTP status for retry logic. */
+export class XApiError extends Error {
+  status: number;
+  constructor(status: number, body: string) {
+    super(`X API error (${status}): ${body}`);
+    this.status = status;
+  }
+}
+
 const X_TWEETS_URL = "https://api.x.com/2/tweets";
 
 const TWEET_FIELDS =
@@ -56,7 +65,7 @@ async function fetchWithToken(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`X API fetch failed (${res.status}): ${err}`);
+    throw new XApiError(res.status, err);
   }
 
   return res.json();
