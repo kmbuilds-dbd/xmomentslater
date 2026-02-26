@@ -105,10 +105,13 @@ export async function PUT(request: NextRequest) {
     // Check for article content
     const textBlock = parsed.blocks.find((b) => b.type === "text");
     const articleId = textBlock ? extractArticleId(textBlock.content) : null;
+    console.log("Re-fetch: text =", textBlock?.content?.slice(0, 100), "| articleId =", articleId);
     if (articleId && parsed.blocks.filter((b) => b.type === "text").length === 1) {
       try {
+        console.log("Fetching article content for ID:", articleId);
         const articleRaw = await fetchTweet(articleId, accessToken);
         const articleParsed = parseTweet(articleRaw);
+        console.log("Article parsed blocks:", articleParsed.blocks.length, "| first text:", articleParsed.blocks.find(b => b.type === "text")?.content?.slice(0, 100));
         if (
           articleParsed.blocks.length > 0 &&
           articleParsed.blocks.some(

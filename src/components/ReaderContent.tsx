@@ -99,6 +99,7 @@ export function ReaderContent({
   const router = useRouter();
   const [scrollProgress, setScrollProgress] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -125,17 +126,31 @@ export function ReaderContent({
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setRefreshError(null);
     try {
       const res = await fetch("/api/posts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: postId }),
       });
+      const data = await res.json();
       if (res.ok) {
-        router.refresh();
+        // Check if the refreshed content is still just a URL
+        const newBlocks = data.parsed?.blocks ?? [];
+        const stillJustUrl =
+          newBlocks.length === 0 || isContentJustUrl(newBlocks);
+        if (stillJustUrl) {
+          setRefreshError(
+            "This X Article's content isn't available via the API. Use the Original link to read it on X."
+          );
+        } else {
+          router.refresh();
+        }
+      } else {
+        setRefreshError(data.error || "Failed to refresh content");
       }
     } catch {
-      // Refresh failed silently
+      setRefreshError("Network error — check your connection");
     } finally {
       setRefreshing(false);
     }
@@ -209,17 +224,36 @@ export function ReaderContent({
         <article className="font-[family-name:var(--font-newsreader)] text-lg leading-relaxed space-y-6">
           {needsRefresh && (
             <div className="rounded-lg border border-dashed py-8 px-6 text-center font-sans">
-              <p className="text-muted-foreground mb-3 text-sm">
-                This post links to an X Article. Click refresh to fetch the full content.
-              </p>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                {refreshing ? "Fetching…" : "Refresh content"}
-              </button>
+              {refreshError ? (
+                <>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    {refreshError}
+                  </p>
+                  <a
+                    href={xPostUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Read on X
+                  </a>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-3 text-sm">
+                    This post links to an X Article. Click refresh to fetch the full content.
+                  </p>
+                  <button
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                    {refreshing ? "Fetching…" : "Refresh content"}
+                  </button>
+                </>
+              )}
             </div>
           )}
           {blocks.map((block, i) => {
