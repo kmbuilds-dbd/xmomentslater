@@ -130,12 +130,18 @@ function BookmarkletContent() {
   };
 
   const tryClose = () => {
+    // Tell the parent (x.com) to close this popup via the stored handle
+    try {
+      window.opener?.postMessage("xml-close", "*");
+    } catch {
+      // opener not available
+    }
+    // Also try closing directly
     try {
       window.close();
     } catch {
       // Browser blocked close
     }
-    // If still open after close attempt, try opener approach
     try {
       self.close();
     } catch {
