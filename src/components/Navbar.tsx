@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Sun, Moon, Monitor, LogOut, Settings, BookOpen } from "lucide-react";
+import { Sun, Moon, Monitor, LogOut, Settings, BookOpen, PlusCircle } from "lucide-react";
 
 const themeOrder = ["system", "light", "dark"] as const;
 
@@ -43,6 +43,11 @@ export function Navbar() {
         xMomentsLater
       </Link>
       <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/dashboard/save">
+            <PlusCircle className="h-4 w-4" />
+          </Link>
+        </Button>
         <Button variant="ghost" size="icon" asChild>
           <Link href={isSettings ? "/dashboard" : "/dashboard/settings"}>
             {isSettings ? (

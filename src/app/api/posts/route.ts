@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { decrypt, encrypt } from "@/lib/encryption";
-import { fetchTweet, XApiError, parseTweet } from "@/lib/parser";
+import { parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
-import { refreshAccessToken } from "@/lib/x-api/oauth";
+import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 // PATCH — mark read / unread
 export async function PATCH(request: NextRequest) {
@@ -101,42 +100,22 @@ export async function PUT(request: NextRequest) {
     );
 
     // Re-fetch from X API with automatic token refresh on 401
-    let accessToken = decrypt(connection.access_token);
     let rawResponse;
     try {
-      rawResponse = await fetchTweet(post.x_post_id, accessToken);
+      rawResponse = await fetchTweetWithRefresh({
+        postId: post.x_post_id,
+        connection,
+        userId: user.id,
+        admin,
+      });
     } catch (err) {
-      if (err instanceof XApiError && err.status === 401) {
-        console.log("Access token expired during re-fetch, refreshing...");
-        try {
-          const refreshToken = decrypt(connection.refresh_token);
-          const newTokens = await refreshAccessToken(refreshToken);
-          accessToken = newTokens.access_token;
-
-          await admin
-            .from("x_connections")
-            .update({
-              access_token: encrypt(newTokens.access_token),
-              refresh_token: encrypt(newTokens.refresh_token),
-              token_expires_at: new Date(
-                Date.now() + newTokens.expires_in * 1000
-              ).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.id);
-
-          rawResponse = await fetchTweet(post.x_post_id, accessToken);
-        } catch (refreshErr) {
-          console.error("Token refresh failed:", refreshErr);
-          return NextResponse.json(
-            { error: "X session expired. Please reconnect your X account in Settings." },
-            { status: 401 }
-          );
-        }
-      } else {
-        console.error("Re-fetch error:", err);
-        return NextResponse.json({ error: "Failed to fetch post from X" }, { status: 502 });
-      }
+      console.error("Re-fetch error:", err);
+      const message =
+        err instanceof Error && err.message.includes("Token refresh failed")
+          ? "X session expired. Please reconnect your X account in Settings."
+          : "Failed to fetch post from X";
+      const status = message.includes("expired") ? 401 : 502;
+      return NextResponse.json({ error: message }, { status });
     }
 
     // Re-parse (article field in tweet.fields handles X Articles automatically)

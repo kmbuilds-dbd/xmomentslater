@@ -106,7 +106,7 @@ Data mutations use co-located server actions (`actions.ts` files inside route fo
 All tables use RLS — users can only access their own data.
 
 - **users** — managed by Supabase Auth
-- **x_connections** — user_id (FK), access_token (encrypted), refresh_token (encrypted), x_handle, connected_at
+- **x_connections** — user_id (FK, unique), access_token (encrypted), refresh_token (encrypted), x_user_id, x_handle, token_expires_at (timestamptz), connected_at, updated_at
 - **saved_posts** — id, user_id (FK), x_post_id, x_post_url, author_name, author_handle, posted_at, saved_at, read_at (null = unread), tags (text[]), raw_api_response (JSONB), parsed_content (JSONB — structured blocks), title (text, nullable — article title), summary (text, nullable — LLM-generated 1-2 sentence summary). GIN index on tags.
 - **feed_tokens** — user_id (PK, FK), token (unique), created_at. One per user, auto-created on dashboard visit.
 
