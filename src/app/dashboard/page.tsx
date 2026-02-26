@@ -7,10 +7,19 @@ interface ParsedContent {
   blocks?: { type: string; content: string }[];
 }
 
-function getPreview(parsed: ParsedContent | null): string {
-  if (!parsed?.blocks) return "";
-  const textBlock = parsed.blocks.find((b) => b.type === "text");
-  return textBlock?.content?.slice(0, 200) ?? "";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPreview(parsed: ParsedContent | null, raw?: any): string {
+  // Try parsed blocks first
+  if (parsed?.blocks) {
+    const textBlock = parsed.blocks.find((b) => b.type === "text");
+    if (textBlock?.content) return textBlock.content.slice(0, 200);
+  }
+  // Fallback: extract text directly from raw API response
+  if (raw?.data) {
+    const text = raw.data.note_tweet?.text ?? raw.data.text;
+    if (text) return text.slice(0, 200);
+  }
+  return "";
 }
 
 export default async function DashboardPage() {
@@ -22,7 +31,7 @@ export default async function DashboardPage() {
   // Fetch saved posts (newest first)
   const { data: savedPosts } = await supabase
     .from("saved_posts")
-    .select("id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content")
+    .select("id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response")
     .order("saved_at", { ascending: false })
     .limit(50);
 
@@ -59,7 +68,7 @@ export default async function DashboardPage() {
               readAt={post.read_at}
               tags={post.tags ?? []}
               xPostUrl={post.x_post_url}
-              preview={getPreview(post.parsed_content as ParsedContent | null)}
+              preview={getPreview(post.parsed_content as ParsedContent | null, post.raw_api_response)}
             />
           ))}
         </div>

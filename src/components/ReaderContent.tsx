@@ -12,6 +12,7 @@ interface ParsedContent {
   blocks: Array<{ type: "text" | "image"; content: string }>;
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface ReaderContentProps {
   postId: string;
   authorName: string | null;
@@ -21,7 +22,9 @@ interface ReaderContentProps {
   tags: string[];
   xPostUrl: string;
   parsedContent: ParsedContent | null;
+  rawApiResponse?: any;
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 function estimateReadTime(blocks: ParsedContent["blocks"]): number {
   const wordCount = blocks
@@ -40,6 +43,35 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
+/**
+ * Extract content blocks from raw X API response as fallback
+ * when parsed_content.blocks is empty.
+ */
+function extractBlocksFromRaw(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  raw: any
+): ParsedContent["blocks"] {
+  if (!raw?.data) return [];
+  const blocks: ParsedContent["blocks"] = [];
+
+  // Prefer note_tweet.text (long posts / X Notes), fall back to data.text
+  const text = raw.data.note_tweet?.text ?? raw.data.text;
+  if (text?.trim()) {
+    blocks.push({ type: "text", content: text.trim() });
+  }
+
+  // Extract images from media includes
+  if (raw.includes?.media) {
+    for (const media of raw.includes.media) {
+      if (media.type === "photo" && media.url) {
+        blocks.push({ type: "image", content: media.url });
+      }
+    }
+  }
+
+  return blocks;
+}
+
 export function ReaderContent({
   authorName,
   authorHandle,
@@ -47,6 +79,7 @@ export function ReaderContent({
   tags,
   xPostUrl,
   parsedContent,
+  rawApiResponse,
 }: ReaderContentProps) {
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -63,7 +96,12 @@ export function ReaderContent({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const blocks = parsedContent?.blocks ?? [];
+  // Use parsed blocks, falling back to raw API response extraction
+  const parsedBlocks = parsedContent?.blocks ?? [];
+  const blocks =
+    parsedBlocks.length > 0
+      ? parsedBlocks
+      : extractBlocksFromRaw(rawApiResponse);
   const readTime = estimateReadTime(blocks);
   const displayName = authorName || authorHandle || "Unknown";
 
