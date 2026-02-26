@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { decrypt } from "@/lib/encryption";
 import { fetchTweet, parseTweet } from "@/lib/parser";
+import { generateSummary } from "@/lib/summarize";
 
 // PATCH — mark read / unread
 export async function PATCH(request: NextRequest) {
@@ -102,6 +103,20 @@ export async function PUT(request: NextRequest) {
     // Re-parse (article field in tweet.fields handles X Articles automatically)
     const parsed = parseTweet(rawResponse);
 
+    // Regenerate title and summary
+    const title =
+      parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
+    const textContent = parsed.blocks
+      .filter((b) => b.type === "text")
+      .map((b) => b.content)
+      .join("\n\n");
+    let summary: string | null = null;
+    try {
+      summary = await generateSummary(textContent, title ?? undefined);
+    } catch (err) {
+      console.error("Summary regeneration failed:", err);
+    }
+
     // Update in database
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey) {
@@ -121,6 +136,8 @@ export async function PUT(request: NextRequest) {
         author_name: parsed.author,
         author_handle: parsed.handle,
         posted_at: parsed.date,
+        title,
+        summary,
       })
       .eq("id", id)
       .eq("user_id", user.id);

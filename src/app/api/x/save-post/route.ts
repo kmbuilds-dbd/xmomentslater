@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { decrypt } from "@/lib/encryption";
 import { extractPostId, fetchTweet, parseTweet } from "@/lib/parser";
+import { generateSummary } from "@/lib/summarize";
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,7 +59,21 @@ export async function POST(request: NextRequest) {
     // 7. Parse into structured content (article field handles X Articles automatically)
     const parsed = parseTweet(rawResponse);
 
-    // 8. Store in database (admin client to bypass RLS for insert)
+    // 8. Extract title and generate LLM summary
+    const title =
+      parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
+    const textContent = parsed.blocks
+      .filter((b) => b.type === "text")
+      .map((b) => b.content)
+      .join("\n\n");
+    let summary: string | null = null;
+    try {
+      summary = await generateSummary(textContent, title ?? undefined);
+    } catch (err) {
+      console.error("Summary generation failed:", err);
+    }
+
+    // 9. Store in database (admin client to bypass RLS for insert)
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey) {
       console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
@@ -82,6 +97,8 @@ export async function POST(request: NextRequest) {
         tags,
         raw_api_response: rawResponse,
         parsed_content: parsed,
+        title,
+        summary,
       })
       .select("id")
       .single();

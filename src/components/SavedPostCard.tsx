@@ -13,6 +13,7 @@ interface SavedPostCardProps {
   readAt: string | null;
   tags: string[];
   xPostUrl: string;
+  title: string | null;
   preview: string;
 }
 
@@ -25,6 +26,7 @@ export function SavedPostCard({
   readAt,
   tags,
   xPostUrl,
+  title,
   preview,
 }: SavedPostCardProps) {
   const [isRead, setIsRead] = useState(!!readAt);
@@ -78,7 +80,14 @@ export function SavedPostCard({
           </span>
         </div>
 
-        {/* Content preview */}
+        {/* Article title */}
+        {title && (
+          <p className="text-sm font-medium mb-1 group-hover:text-primary transition-colors">
+            {title}
+          </p>
+        )}
+
+        {/* Content preview / summary */}
         <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
           {preview}
         </p>

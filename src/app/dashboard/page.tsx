@@ -48,7 +48,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   let query = supabase
     .from("saved_posts")
     .select(
-      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response",
+      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title",
       { count: "exact" }
     );
 
@@ -58,7 +58,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     const safeQ = q.replace(/[,()]/g, "");
     if (safeQ) {
       query = query.or(
-        `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%`
+        `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%,summary.ilike.%${safeQ}%,title.ilike.%${safeQ}%`
       );
     }
   }
@@ -115,10 +115,12 @@ export default async function DashboardPage({ searchParams }: Props) {
     readAt: post.read_at,
     tags: post.tags ?? [],
     xPostUrl: post.x_post_url,
-    preview: getPreview(
-      post.parsed_content as ParsedContent | null,
-      post.raw_api_response
-    ),
+    title: post.title as string | null,
+    preview: (post.summary as string | null) ??
+      getPreview(
+        post.parsed_content as ParsedContent | null,
+        post.raw_api_response
+      ),
   }));
 
   const totalCount = count ?? 0;

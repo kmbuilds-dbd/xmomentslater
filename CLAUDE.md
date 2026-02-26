@@ -107,7 +107,7 @@ All tables use RLS — users can only access their own data.
 
 - **users** — managed by Supabase Auth
 - **x_connections** — user_id (FK), access_token (encrypted), refresh_token (encrypted), x_handle, connected_at
-- **saved_posts** — id, user_id (FK), x_post_id, x_post_url, author_name, author_handle, posted_at, saved_at, read_at (null = unread), tags (text[]), raw_api_response (JSONB), parsed_content (JSONB — structured blocks). GIN index on tags.
+- **saved_posts** — id, user_id (FK), x_post_id, x_post_url, author_name, author_handle, posted_at, saved_at, read_at (null = unread), tags (text[]), raw_api_response (JSONB), parsed_content (JSONB — structured blocks), title (text, nullable — article title), summary (text, nullable — LLM-generated 1-2 sentence summary). GIN index on tags.
 - **feed_tokens** — user_id (PK, FK), token (unique), created_at. One per user, auto-created on dashboard visit.
 
 ## Build Order
@@ -137,6 +137,7 @@ Also in `.env.local`:
 - `X_CONSUMER_KEY` / `X_CONSUMER_SECRET` — X API v1.1 credentials
 - `X_BEARER_TOKEN` — App bearer token for X API v2 (required for article content fetching)
 - `ALLOWED_SIGNUP_EMAILS` — Comma-separated whitelist of emails allowed to sign up (empty = open signup)
+- `ANTHROPIC_API_KEY` — Anthropic API key for LLM-generated post summaries (Claude 3.5 Haiku)
 
 `NEXT_PUBLIC_*` vars are baked in at build time. `@/*` path alias maps to `./src/*`.
 

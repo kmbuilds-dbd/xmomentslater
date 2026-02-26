@@ -14,6 +14,7 @@ interface Post {
   readAt: string | null;
   tags: string[];
   xPostUrl: string;
+  title: string | null;
   preview: string;
 }
 
@@ -117,7 +118,7 @@ export function LibraryView({
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by author..."
+            placeholder="Search posts..."
             className="w-full text-sm pl-9 pr-8 py-2 rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
           />
           {searchInput && (
@@ -184,6 +185,7 @@ export function LibraryView({
               readAt={post.readAt}
               tags={post.tags}
               xPostUrl={post.xPostUrl}
+              title={post.title}
               preview={post.preview}
             />
           ))}
