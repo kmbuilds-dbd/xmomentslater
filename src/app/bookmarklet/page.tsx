@@ -120,17 +120,31 @@ function BookmarkletContent() {
         return;
       }
       setStatus("saved");
-      setTimeout(() => {
-        window.close();
-      }, 1500);
+      // Try to close immediately, then retry
+      setTimeout(() => tryClose(), 800);
+      setTimeout(() => tryClose(), 2000);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Network error");
       setStatus("error");
     }
   };
 
+  const tryClose = () => {
+    try {
+      window.close();
+    } catch {
+      // Browser blocked close
+    }
+    // If still open after close attempt, try opener approach
+    try {
+      self.close();
+    } catch {
+      // fallback handled by UI
+    }
+  };
+
   const handleClose = () => {
-    window.close();
+    tryClose();
   };
 
   // Saved confirmation
@@ -140,7 +154,13 @@ function BookmarkletContent() {
         <div className="rounded-full bg-primary/10 p-3 mb-3">
           <Check className="h-6 w-6 text-primary" />
         </div>
-        <p className="font-semibold text-sm">Saved!</p>
+        <p className="font-semibold text-sm mb-3">Saved!</p>
+        <button
+          onClick={tryClose}
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+        >
+          Close this window
+        </button>
       </div>
     );
   }
