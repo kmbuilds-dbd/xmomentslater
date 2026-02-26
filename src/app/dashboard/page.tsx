@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { XConnectionCard } from "@/components/XConnectionCard";
 import { FeedUrlCard } from "@/components/FeedUrlCard";
+import { BookmarkletButton } from "@/components/BookmarkletButton";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
 
 export const dynamic = "force-dynamic";
@@ -65,13 +66,7 @@ export default async function DashboardPage() {
           <p className="text-xs text-muted-foreground mb-3">
             Drag this button to your bookmarks bar. Click it on any X post to save it.
           </p>
-          <a
-            href={getBookmarkletCode(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001")}
-            className="inline-block text-xs font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-            onClick={(e) => e.preventDefault()}
-          >
-            Save to xMomentsLater
-          </a>
+          <BookmarkletButton bookmarkletCode={getBookmarkletCode(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001")} />
         </div>
       )}
 
