@@ -21,24 +21,28 @@ export default async function DashboardPage() {
   // Fetch or create feed token
   let feedToken: string | null = null;
   if (user) {
-    const { data: existing } = await supabase
-      .from("feed_tokens")
-      .select("token")
-      .single();
-
-    if (existing) {
-      feedToken = existing.token;
-    } else {
-      const admin = createAdminClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-      const { data: created } = await admin
+    try {
+      const { data: existing } = await supabase
         .from("feed_tokens")
-        .insert({ user_id: user.id })
         .select("token")
         .single();
-      feedToken = created?.token ?? null;
+
+      if (existing) {
+        feedToken = existing.token;
+      } else if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const admin = createAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY
+        );
+        const { data: created } = await admin
+          .from("feed_tokens")
+          .insert({ user_id: user.id })
+          .select("token")
+          .single();
+        feedToken = created?.token ?? null;
+      }
+    } catch (err) {
+      console.error("Feed token error:", err);
     }
   }
 

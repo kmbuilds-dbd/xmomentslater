@@ -5,43 +5,55 @@ import { exchangeCodeForTokens, fetchXUser } from "@/lib/x-api/oauth";
 import { encrypt } from "@/lib/encryption";
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  const error = searchParams.get("error");
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
 
-  // User denied access
-  if (error) {
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_denied`);
-  }
-
-  if (!code || !state) {
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_missing_params`);
-  }
-
-  const cookieStore = await cookies();
-  const storedState = cookieStore.get("x_oauth_state")?.value;
-  const codeVerifier = cookieStore.get("x_oauth_verifier")?.value;
-
-  // Clean up cookies
-  cookieStore.delete("x_oauth_state");
-  cookieStore.delete("x_oauth_verifier");
-
-  if (!storedState || state !== storedState) {
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_state_mismatch`);
-  }
-
-  if (!codeVerifier) {
-    return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_no_verifier`);
-  }
-
-  const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID!;
-  const clientSecret = process.env.X_CLIENT_SECRET!;
-  const redirectUri = `${baseUrl}/api/x/callback`;
-
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    const error = searchParams.get("error");
+
+    // User denied access
+    if (error) {
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_denied`);
+    }
+
+    if (!code || !state) {
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_missing_params`);
+    }
+
+    const cookieStore = await cookies();
+    const storedState = cookieStore.get("x_oauth_state")?.value;
+    const codeVerifier = cookieStore.get("x_oauth_verifier")?.value;
+
+    // Clean up cookies (safe to fail)
+    try {
+      cookieStore.delete("x_oauth_state");
+      cookieStore.delete("x_oauth_verifier");
+    } catch {
+      // Cookie deletion may fail in some Next.js versions — non-critical
+    }
+
+    if (!storedState || state !== storedState) {
+      console.error("X OAuth state mismatch", { storedState: !!storedState, state });
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_state_mismatch`);
+    }
+
+    if (!codeVerifier) {
+      console.error("X OAuth missing code verifier");
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_no_verifier`);
+    }
+
+    const clientId = process.env.NEXT_PUBLIC_X_CLIENT_ID;
+    const clientSecret = process.env.X_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      console.error("Missing X OAuth credentials", { clientId: !!clientId, clientSecret: !!clientSecret });
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_failed`);
+    }
+
+    const redirectUri = `${baseUrl}/api/x/callback`;
+
     const tokens = await exchangeCodeForTokens({
       code,
       redirectUri,
@@ -66,10 +78,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Upsert connection (service role for write access past RLS)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+      return NextResponse.redirect(`${baseUrl}/dashboard?error=x_auth_failed`);
+    }
+
     const { createClient: createAdminClient } = await import("@supabase/supabase-js");
     const adminClient = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      serviceRoleKey
     );
 
     const { error: dbError } = await adminClient
