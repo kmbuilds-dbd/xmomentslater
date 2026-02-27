@@ -77,11 +77,12 @@ export default async function SettingsPage() {
       )}
 
       {/* iOS Shortcut */}
-      {xConnection && (
+      {xConnection && feedToken && (
         <section className="mb-8">
           <h2 className="text-sm font-medium mb-3">Save from iOS</h2>
           <IOSShortcutCard
-            saveUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/dashboard/save?url=`}
+            apiUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/api/x/save-post`}
+            token={feedToken}
           />
         </section>
       )}
