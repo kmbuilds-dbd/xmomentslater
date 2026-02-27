@@ -4,18 +4,33 @@ import { useState } from "react";
 import { Copy, Check, Smartphone, ChevronDown, ChevronUp } from "lucide-react";
 
 export function IOSShortcutCard({
-  saveUrl,
+  apiUrl,
+  token,
 }: {
-  saveUrl: string;
+  apiUrl: string;
+  token: string;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(saveUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
+
+  const CopyButton = ({ text, field }: { text: string; field: string }) => (
+    <button
+      onClick={() => handleCopy(text, field)}
+      className="shrink-0 text-muted-foreground hover:text-foreground p-2"
+    >
+      {copiedField === field ? (
+        <Check className="h-4 w-4 text-primary" />
+      ) : (
+        <Copy className="h-4 w-4" />
+      )}
+    </button>
+  );
 
   return (
     <div className="rounded-lg border px-5 py-4">
@@ -24,7 +39,8 @@ export function IOSShortcutCard({
         <p className="text-sm font-medium">iOS Shortcut</p>
       </div>
       <p className="text-xs text-muted-foreground mb-4">
-        Save posts from the X app&apos;s share sheet on iPhone or iPad.
+        Save posts from the X app&apos;s share sheet on iPhone or iPad &mdash;
+        no browser needed.
       </p>
 
       <button
@@ -51,8 +67,8 @@ export function IOSShortcutCard({
                 Open the <strong>Shortcuts</strong> app on your iPhone
               </li>
               <li>
-                Tap the <strong>+</strong> button in the top-right
-                corner to create a new shortcut
+                Tap the <strong>+</strong> button in the top-right corner to
+                create a new shortcut
               </li>
             </ul>
           </div>
@@ -64,103 +80,122 @@ export function IOSShortcutCard({
             </p>
             <ul className="text-xs text-muted-foreground space-y-1.5 ml-4 list-disc">
               <li>
-                Tap the <strong>dropdown arrow</strong> (&#9662;) next
-                to &ldquo;New Shortcut&rdquo; at the top, then tap{" "}
+                Tap the <strong>dropdown arrow</strong> (&#9662;) next to
+                &ldquo;New Shortcut&rdquo; at the top, then tap{" "}
                 <strong>Rename</strong> and type{" "}
                 <strong>Save to xMomentsLater</strong>
               </li>
               <li>
-                Tap the <strong>&#9432; info button</strong> in the
-                bottom toolbar of the editor
+                Tap the <strong>&#9432; info button</strong> in the bottom
+                toolbar of the editor
               </li>
               <li>
                 Turn on <strong>Show in Share Sheet</strong>
               </li>
               <li>
-                Under <strong>Share Sheet Types</strong>, deselect
-                everything except <strong>URLs</strong> (found under
-                the Web category)
+                Under <strong>Share Sheet Types</strong>, deselect everything
+                except <strong>URLs</strong> (found under the Web category)
               </li>
               <li>
                 Tap <strong>Done</strong> to close the details pane
               </li>
             </ul>
             <p className="text-[11px] text-muted-foreground/70 ml-4 mt-1.5">
-              You should now see a &ldquo;Receive <strong>URLs</strong>{" "}
-              input from <strong>Share Sheet</strong>&rdquo; action at
-              the top of your shortcut.
+              You should now see a &ldquo;Receive <strong>URLs</strong> input
+              from <strong>Share Sheet</strong>&rdquo; action at the top of
+              your shortcut.
             </p>
           </div>
 
           {/* Step 3 */}
           <div>
             <p className="text-xs font-medium mb-1.5">
-              3. Add the Text action
+              3. Add the &ldquo;Get Contents of URL&rdquo; action
             </p>
             <ul className="text-xs text-muted-foreground space-y-1.5 ml-4 list-disc">
               <li>
                 Tap <strong>Add Action</strong>, search for{" "}
-                <strong>Text</strong>, and add the{" "}
-                <strong>Text</strong> action
+                <strong>Get Contents of URL</strong>, and add it
               </li>
               <li>
-                Tap inside the text field and paste this URL:
+                Tap the URL field and paste this API URL:
               </li>
             </ul>
 
-            {/* Copyable URL */}
+            {/* Copyable API URL */}
             <div className="flex items-center gap-2 mt-2 ml-4">
               <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md truncate">
-                {saveUrl}
+                {apiUrl}
               </code>
-              <button
-                onClick={handleCopy}
-                className="shrink-0 text-muted-foreground hover:text-foreground p-2"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </button>
+              <CopyButton text={apiUrl} field="apiUrl" />
             </div>
 
             <ul className="text-xs text-muted-foreground space-y-1.5 ml-4 list-disc mt-2">
               <li>
-                Place your cursor at the very end (after the{" "}
-                <code className="bg-muted px-1 py-0.5 rounded text-[11px]">
-                  =
-                </code>
-                ), then look at the <strong>variables bar</strong>{" "}
-                above the keyboard and tap{" "}
-                <strong>Shortcut Input</strong>
+                Tap <strong>Advanced</strong> to expand the request options
+              </li>
+              <li>
+                Change <strong>Method</strong> to <strong>POST</strong>
+              </li>
+              <li>
+                Under <strong>Headers</strong>, add a new header:
+                <ul className="mt-1.5 space-y-1 ml-4 list-disc">
+                  <li>
+                    Key: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Authorization</code>
+                  </li>
+                  <li>
+                    Value &mdash; copy and paste this:
+                  </li>
+                </ul>
               </li>
             </ul>
-            <p className="text-[11px] text-muted-foreground/70 ml-4 mt-1.5">
-              The text field should now show:{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">
-                {saveUrl}
-                <span className="text-primary font-medium">
-                  Shortcut Input
-                </span>
+
+            {/* Copyable Bearer token */}
+            <div className="flex items-center gap-2 mt-2 ml-4">
+              <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md truncate">
+                Bearer {token}
               </code>
-            </p>
+              <CopyButton text={`Bearer ${token}`} field="token" />
+            </div>
+
+            <ul className="text-xs text-muted-foreground space-y-1.5 ml-4 list-disc mt-2">
+              <li>
+                Add another header:
+                <ul className="mt-1.5 space-y-1 ml-4 list-disc">
+                  <li>
+                    Key: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Content-Type</code>
+                  </li>
+                  <li>
+                    Value: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">application/json</code>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                Under <strong>Request Body</strong>, select <strong>JSON</strong>
+              </li>
+              <li>
+                Add a key called{" "}
+                <code className="bg-muted px-1 py-0.5 rounded text-[11px]">url</code>{" "}
+                &mdash; for the value, tap the field and select{" "}
+                <strong>Shortcut Input</strong> from the variables bar above
+                the keyboard
+              </li>
+            </ul>
           </div>
 
           {/* Step 4 */}
           <div>
             <p className="text-xs font-medium mb-1.5">
-              4. Add the Open URLs action
+              4. Add a notification (optional)
             </p>
             <ul className="text-xs text-muted-foreground space-y-1.5 ml-4 list-disc">
               <li>
                 Tap the search bar at the bottom, search for{" "}
-                <strong>Open URLs</strong>, and add it
+                <strong>Show Notification</strong>, and add it
               </li>
               <li>
-                It will automatically use the <strong>Text</strong>{" "}
-                output as its input &mdash; if not, tap its URL field
-                and select <strong>Text</strong> from the variables bar
+                Set the body to{" "}
+                <strong>Saved to xMomentsLater</strong>
               </li>
             </ul>
           </div>
@@ -184,57 +219,47 @@ export function IOSShortcutCard({
                 <strong>Share Sheet</strong>
               </li>
               <li>
-                <strong>Text</strong>:{" "}
+                <strong>Get Contents of URL</strong>: POST to{" "}
                 <code className="bg-muted px-1 py-0.5 rounded">
-                  {saveUrl}
-                  <span className="text-primary font-medium">
-                    Shortcut Input
-                  </span>
-                </code>
+                  {apiUrl}
+                </code>{" "}
+                with Bearer token and JSON body
               </li>
               <li>
-                <strong>Open URLs</strong>:{" "}
-                <span className="text-primary font-medium">Text</span>
+                <strong>Show Notification</strong>: Saved to xMomentsLater
               </li>
             </ol>
           </div>
 
           {/* Usage */}
           <div>
-            <p className="text-xs font-medium mb-1.5">
-              How to use it
-            </p>
+            <p className="text-xs font-medium mb-1.5">How to use it</p>
             <p className="text-xs text-muted-foreground ml-4">
-              Tap <strong>Share</strong> on any post in the X app, then
-              tap <strong>Save to xMomentsLater</strong> in the share
-              sheet. Safari opens with the post URL pre-filled &mdash;
-              pick your tags and tap Save.
+              Tap <strong>Share</strong> on any post in the X app, then tap{" "}
+              <strong>Save to xMomentsLater</strong> in the share sheet. The
+              post saves instantly in the background &mdash; you&apos;ll see a
+              notification when it&apos;s done. No browser needed.
             </p>
             <p className="text-[11px] text-muted-foreground/70 ml-4 mt-1.5">
-              Don&apos;t see it? Scroll to the bottom of the share sheet
-              and tap <strong>Edit Actions</strong> to add it to your
-              favorites.
+              Don&apos;t see it? Scroll to the bottom of the share sheet and
+              tap <strong>Edit Actions</strong> to add it to your favorites.
+            </p>
+          </div>
+
+          {/* Token warning */}
+          <div className="rounded-md bg-muted/50 px-4 py-3 ml-0">
+            <p className="text-[11px] text-muted-foreground">
+              <strong>Note:</strong> The token above is private to your
+              account. Don&apos;t share it with anyone.
             </p>
           </div>
         </div>
       )}
 
       {!expanded && (
-        <div className="flex items-center gap-2">
-          <code className="flex-1 text-xs bg-muted px-3 py-2 rounded-md truncate">
-            {saveUrl}
-          </code>
-          <button
-            onClick={handleCopy}
-            className="shrink-0 text-muted-foreground hover:text-foreground p-2"
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-primary" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Saves posts directly via API &mdash; no login required on your phone.
+        </p>
       )}
     </div>
   );
