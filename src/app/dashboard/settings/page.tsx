@@ -81,8 +81,7 @@ export default async function SettingsPage() {
         <section className="mb-8">
           <h2 className="text-sm font-medium mb-3">Save from iOS</h2>
           <IOSShortcutCard
-            apiUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/api/x/save-post`}
-            token={feedToken}
+            saveUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/save?token=${feedToken}&url=`}
           />
         </section>
       )}
