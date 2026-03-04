@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
         parsed_content: parsed,
         title,
         summary,
+        source: "manual",
+        text_content: textContent || null,
       })
       .select("id")
       .single();

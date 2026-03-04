@@ -45,20 +45,27 @@ export default async function DashboardPage({ searchParams }: Props) {
   );
 
   // Build query with count for pagination
+  const source = typeof params.source === "string" ? params.source : "";
+
   let query = supabase
     .from("saved_posts")
     .select(
-      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title",
+      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source",
       { count: "exact" }
     );
 
-  // Search filter (author name or handle)
+  // Source filter (manual vs bookmark)
+  if (source === "manual" || source === "bookmark") {
+    query = query.eq("source", source);
+  }
+
+  // Search filter (author, title, summary, text content, tags)
   if (q) {
     // Sanitize for PostgREST filter syntax — strip characters that could break .or()
     const safeQ = q.replace(/[,()]/g, "");
     if (safeQ) {
       query = query.or(
-        `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%,summary.ilike.%${safeQ}%,title.ilike.%${safeQ}%`
+        `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%,summary.ilike.%${safeQ}%,title.ilike.%${safeQ}%,text_content.ilike.%${safeQ}%`
       );
     }
   }
@@ -121,6 +128,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         post.parsed_content as ParsedContent | null,
         post.raw_api_response
       ),
+    source: (post.source as string) ?? "manual",
   }));
 
   const totalCount = count ?? 0;
@@ -144,6 +152,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         currentSearch={q}
         currentTag={tag}
         currentSort={sort}
+        currentSource={source}
         hasXConnection={!!xConnection}
       />
     </main>
