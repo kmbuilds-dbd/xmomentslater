@@ -59,7 +59,8 @@ export function SavedPostCard({
 
   if (deleted) return null;
 
-  const timeAgo = formatTimeAgo(savedAt);
+  const postedTimeAgo = postedAt ? formatTimeAgo(postedAt) : null;
+  const savedTimeAgo = formatTimeAgo(savedAt);
   const displayName = authorName || authorHandle || "Unknown";
 
   return (
@@ -85,7 +86,7 @@ export function SavedPostCard({
               </span>
             )}
             <span className="text-xs text-muted-foreground">
-              {timeAgo}
+              {postedTimeAgo ? `posted ${postedTimeAgo}` : `saved ${savedTimeAgo}`}
             </span>
           </span>
         </div>
