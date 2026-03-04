@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
           page = await fetchBookmarks(accessToken, conn.x_user_id, paginationToken);
         } catch (err: unknown) {
           // Refresh token on 401 and retry once
-          if (err && typeof err === "object" && "status" in err && (err as { status: number }).status === 401) {
+          const errStatus = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : 0;
+          if (errStatus === 401 || errStatus === 403) {
             console.log(`Token expired for user ${conn.user_id}, refreshing...`);
             const refreshToken = decrypt(conn.refresh_token);
             const newTokens = await refreshAccessToken(refreshToken);
