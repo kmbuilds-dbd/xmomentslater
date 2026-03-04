@@ -1,0 +1,17 @@
+name: Sync X Bookmarks
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Every hour
+  workflow_dispatch: {} # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger bookmark sync
+        run: |
+          curl -f -X POST "${{ secrets.APP_URL }}/api/cron/sync-bookmarks" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 300

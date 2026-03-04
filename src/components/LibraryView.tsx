@@ -16,6 +16,7 @@ interface Post {
   xPostUrl: string;
   title: string | null;
   preview: string;
+  source: string;
 }
 
 interface LibraryViewProps {
@@ -27,6 +28,7 @@ interface LibraryViewProps {
   currentSearch: string;
   currentTag: string;
   currentSort: string;
+  currentSource: string;
   hasXConnection: boolean;
 }
 
@@ -39,6 +41,7 @@ export function LibraryView({
   currentSearch,
   currentTag,
   currentSort,
+  currentSource,
   hasXConnection,
 }: LibraryViewProps) {
   const router = useRouter();
@@ -58,6 +61,7 @@ export function LibraryView({
         q: currentSearch,
         tag: currentTag,
         sort: currentSort,
+        source: currentSource,
         page: String(currentPage),
       };
 
@@ -69,13 +73,14 @@ export function LibraryView({
       if (current.tag) params.set("tag", current.tag);
       if (current.sort && current.sort !== "saved_desc")
         params.set("sort", current.sort);
+      if (current.source) params.set("source", current.source);
       if (current.page && current.page !== "1")
         params.set("page", current.page);
 
       const qs = params.toString();
       router.push(`/dashboard${qs ? `?${qs}` : ""}`, { scroll: false });
     },
-    [router, currentSearch, currentTag, currentSort, currentPage]
+    [router, currentSearch, currentTag, currentSort, currentSource, currentPage]
   );
 
   // Debounced search — fires 300ms after user stops typing
@@ -92,6 +97,10 @@ export function LibraryView({
     updateParams({ tag: tag === currentTag ? "" : tag, page: "1" });
   };
 
+  const handleSourceChange = (source: string) => {
+    updateParams({ source: source === currentSource ? "" : source, page: "1" });
+  };
+
   const handleSortChange = (sort: string) => {
     updateParams({ sort, page: "1" });
   };
@@ -106,7 +115,7 @@ export function LibraryView({
   };
 
   const hasFilters =
-    currentSearch || currentTag || currentSort !== "saved_desc";
+    currentSearch || currentTag || currentSort !== "saved_desc" || currentSource;
 
   return (
     <>
@@ -138,6 +147,27 @@ export function LibraryView({
           <option value="saved_desc">Newest saved</option>
           <option value="unread">Unread first</option>
         </select>
+      </div>
+
+      {/* Source filter */}
+      <div className="flex gap-1.5 mb-4">
+        {[
+          { value: "", label: "All" },
+          { value: "manual", label: "Saved" },
+          { value: "bookmark", label: "Bookmarked" },
+        ].map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => handleSourceChange(opt.value)}
+            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+              (opt.value === "" ? !currentSource : currentSource === opt.value)
+                ? "bg-foreground text-background border-foreground"
+                : "bg-background text-foreground hover:bg-secondary"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* Tag filters */}
@@ -187,6 +217,7 @@ export function LibraryView({
               xPostUrl={post.xPostUrl}
               title={post.title}
               preview={post.preview}
+              source={post.source}
             />
           ))}
 
