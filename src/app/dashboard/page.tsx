@@ -38,7 +38,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Parse query params
   const q = typeof params.q === "string" ? params.q.trim() : "";
   const tag = typeof params.tag === "string" ? params.tag.trim() : "";
-  const sort = typeof params.sort === "string" ? params.sort : "saved_desc";
+  const sort = typeof params.sort === "string" ? params.sort : "posted_desc";
   const page = Math.max(
     1,
     parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1
@@ -77,13 +77,15 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   // Sort order
   if (sort === "unread") {
-    // Unread posts first (read_at IS NULL → NULLS FIRST), then by saved_at desc
+    // Unread posts first (read_at IS NULL → NULLS FIRST), then by posted_at desc
     query = query
       .order("read_at", { ascending: true, nullsFirst: true })
-      .order("saved_at", { ascending: false });
-  } else {
-    // Default: newest saved first
+      .order("posted_at", { ascending: false, nullsFirst: false });
+  } else if (sort === "saved_desc") {
     query = query.order("saved_at", { ascending: false });
+  } else {
+    // Default: newest posted first (preserves chronological order for synced bookmarks)
+    query = query.order("posted_at", { ascending: false, nullsFirst: false });
   }
 
   // Pagination
