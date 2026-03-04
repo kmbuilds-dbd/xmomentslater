@@ -71,7 +71,7 @@ export function LibraryView({
       // Build params, skipping defaults/empty values to keep URL clean
       if (current.q) params.set("q", current.q);
       if (current.tag) params.set("tag", current.tag);
-      if (current.sort && current.sort !== "saved_desc")
+      if (current.sort && current.sort !== "posted_desc")
         params.set("sort", current.sort);
       if (current.source) params.set("source", current.source);
       if (current.page && current.page !== "1")
@@ -115,7 +115,7 @@ export function LibraryView({
   };
 
   const hasFilters =
-    currentSearch || currentTag || currentSort !== "saved_desc" || currentSource;
+    currentSearch || currentTag || currentSort !== "posted_desc" || currentSource;
 
   return (
     <>
@@ -144,6 +144,7 @@ export function LibraryView({
           onChange={(e) => handleSortChange(e.target.value)}
           className="text-sm py-2 px-3 rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring"
         >
+          <option value="posted_desc">Newest posted</option>
           <option value="saved_desc">Newest saved</option>
           <option value="unread">Unread first</option>
         </select>
