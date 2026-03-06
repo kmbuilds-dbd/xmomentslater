@@ -1,21 +1,51 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { decrypt, encrypt } from "@/lib/encryption";
-import { extractPostId, fetchTweet, XApiError, parseTweet } from "@/lib/parser";
+import { extractPostId, parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
-import { refreshAccessToken } from "@/lib/x-api/oauth";
+import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authenticate
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // 1. Authenticate — session cookie OR Bearer token (for iOS Shortcuts / API)
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!serviceRoleKey) {
+      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+    }
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey
+    );
+
+    let userId: string;
+    const authHeader = request.headers.get("Authorization");
+
+    if (authHeader?.startsWith("Bearer ")) {
+      // Token-based auth (iOS Shortcuts, external API clients)
+      const token = authHeader.slice(7);
+      const { data: feedToken } = await admin
+        .from("feed_tokens")
+        .select("user_id")
+        .eq("token", token)
+        .single();
+
+      if (!feedToken) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      userId = feedToken.user_id;
+    } else {
+      // Session-based auth (bookmarklet, web app)
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      userId = user.id;
     }
 
     // 2. Parse request body
@@ -36,66 +66,33 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Get user's X connection (encrypted tokens)
-    const { data: connection } = await supabase
+    const { data: connection } = await admin
       .from("x_connections")
       .select("access_token, refresh_token")
+      .eq("user_id", userId)
       .single();
 
     if (!connection) {
       return NextResponse.json({ error: "X account not connected" }, { status: 400 });
     }
 
-    // 5. Admin client (needed for token refresh + DB insert)
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!serviceRoleKey) {
-      console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
-      return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-    }
-
-    const admin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey
-    );
-
     // 6. Fetch tweet — with automatic token refresh on 401
-    let accessToken = decrypt(connection.access_token);
     let rawResponse;
     try {
-      rawResponse = await fetchTweet(postId, accessToken);
+      rawResponse = await fetchTweetWithRefresh({
+        postId,
+        connection,
+        userId: userId,
+        admin,
+      });
     } catch (err) {
-      // If token expired (401), refresh and retry once
-      if (err instanceof XApiError && err.status === 401) {
-        console.log("Access token expired, refreshing...");
-        try {
-          const refreshToken = decrypt(connection.refresh_token);
-          const newTokens = await refreshAccessToken(refreshToken);
-          accessToken = newTokens.access_token;
-
-          // Store refreshed tokens
-          await admin
-            .from("x_connections")
-            .update({
-              access_token: encrypt(newTokens.access_token),
-              refresh_token: encrypt(newTokens.refresh_token),
-              token_expires_at: new Date(
-                Date.now() + newTokens.expires_in * 1000
-              ).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.id);
-
-          rawResponse = await fetchTweet(postId, accessToken);
-        } catch (refreshErr) {
-          console.error("Token refresh failed:", refreshErr);
-          return NextResponse.json(
-            { error: "X session expired. Please reconnect your X account in Settings." },
-            { status: 401 }
-          );
-        }
-      } else {
-        console.error("X API fetch error:", err);
-        return NextResponse.json({ error: "Failed to fetch post from X" }, { status: 502 });
-      }
+      console.error("X API fetch error:", err);
+      const message =
+        err instanceof Error && err.message.includes("Token refresh failed")
+          ? "X session expired. Please reconnect your X account in Settings."
+          : "Failed to fetch post from X";
+      const status = message.includes("expired") ? 401 : 502;
+      return NextResponse.json({ error: message }, { status });
     }
 
     // 7. Parse into structured content (article field handles X Articles automatically)
@@ -119,7 +116,7 @@ export async function POST(request: NextRequest) {
     const { data: savedPost, error: dbError } = await admin
       .from("saved_posts")
       .insert({
-        user_id: user.id,
+        user_id: userId,
         x_post_id: postId,
         x_post_url: url,
         author_name: parsed.author,
@@ -130,6 +127,8 @@ export async function POST(request: NextRequest) {
         parsed_content: parsed,
         title,
         summary,
+        source: "manual",
+        text_content: textContent || null,
       })
       .select("id")
       .single();

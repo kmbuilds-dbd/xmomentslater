@@ -3,6 +3,7 @@ import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { XConnectionCard } from "@/components/XConnectionCard";
 import { FeedUrlCard } from "@/components/FeedUrlCard";
 import { BookmarkletButton } from "@/components/BookmarkletButton";
+import { IOSShortcutCard } from "@/components/IOSShortcutCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,16 @@ export default async function SettingsPage() {
             </p>
             <BookmarkletButton bookmarkletCode={getBookmarkletCode(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001")} />
           </div>
+        </section>
+      )}
+
+      {/* iOS Shortcut */}
+      {xConnection && feedToken && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium mb-3">Save from iOS</h2>
+          <IOSShortcutCard
+            saveUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/save?token=${feedToken}&url=`}
+          />
         </section>
       )}
 

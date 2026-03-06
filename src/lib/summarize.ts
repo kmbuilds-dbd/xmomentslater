@@ -1,5 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+let _client: Anthropic | null = null;
+
+function getClient(): Anthropic | null {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  if (!_client) _client = new Anthropic({ apiKey });
+  return _client;
+}
+
 /**
  * Generate a 1-2 sentence summary of post content using Claude.
  * Returns null on failure — callers should fall back to truncated text.
@@ -8,11 +17,10 @@ export async function generateSummary(
   text: string,
   title?: string
 ): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || !text.trim()) return null;
+  const client = getClient();
+  if (!client || !text.trim()) return null;
 
   try {
-    const client = new Anthropic({ apiKey });
     const input = title ? `Title: ${title}\n\n${text}` : text;
 
     const message = await client.messages.create({

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Trash2, ExternalLink } from "lucide-react";
+import { BookOpen, Trash2, ExternalLink, Bookmark } from "lucide-react";
 
 interface SavedPostCardProps {
   id: string;
@@ -15,6 +15,7 @@ interface SavedPostCardProps {
   xPostUrl: string;
   title: string | null;
   preview: string;
+  source?: string;
 }
 
 export function SavedPostCard({
@@ -28,6 +29,7 @@ export function SavedPostCard({
   xPostUrl,
   title,
   preview,
+  source,
 }: SavedPostCardProps) {
   const [isRead, setIsRead] = useState(!!readAt);
   const [deleted, setDeleted] = useState(false);
@@ -57,7 +59,8 @@ export function SavedPostCard({
 
   if (deleted) return null;
 
-  const timeAgo = formatTimeAgo(savedAt);
+  const postedTimeAgo = postedAt ? formatTimeAgo(postedAt) : null;
+  const savedTimeAgo = formatTimeAgo(savedAt);
   const displayName = authorName || authorHandle || "Unknown";
 
   return (
@@ -75,8 +78,16 @@ export function SavedPostCard({
           {authorHandle && (
             <span className="text-xs text-muted-foreground">@{authorHandle}</span>
           )}
-          <span className="text-xs text-muted-foreground ml-auto shrink-0">
-            {timeAgo}
+          <span className="flex items-center gap-1.5 ml-auto shrink-0">
+            {source === "bookmark" && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <Bookmark className="h-2.5 w-2.5" />
+                Bookmarked
+              </span>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {postedTimeAgo ? `posted ${postedTimeAgo}` : `saved ${savedTimeAgo}`}
+            </span>
           </span>
         </div>
 

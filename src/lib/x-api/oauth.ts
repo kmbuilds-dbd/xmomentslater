@@ -3,7 +3,7 @@ import { randomBytes, createHash } from "crypto";
 const X_AUTH_URL = "https://x.com/i/oauth2/authorize";
 const X_TOKEN_URL = "https://api.x.com/2/oauth2/token";
 const X_USERS_ME_URL = "https://api.x.com/2/users/me";
-const SCOPES = "tweet.read users.read offline.access";
+const SCOPES = "tweet.read users.read bookmark.read offline.access";
 
 export function generatePKCE() {
   const verifier = randomBytes(32).toString("base64url");
