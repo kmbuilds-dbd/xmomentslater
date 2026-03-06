@@ -24,10 +24,11 @@ No test suite exists yet.
 ## Tech Stack
 
 - **Next.js 16** (App Router, React 19, TypeScript 5)
-- **Tailwind CSS 4** + shadcn/ui
+- **Tailwind CSS 4** + shadcn/ui (cn() utility via clsx + tailwind-merge)
 - **Supabase** — PostgreSQL, Auth (email/password), Row-Level Security
 - **X API** — OAuth 2.0 with PKCE (user-level access, user owns rate limits)
-- **Vercel** — hosting and deployment
+- **Anthropic SDK** — Claude 3.5 Haiku for post summaries (`lib/summarize.ts`)
+- **Railway** — hosting and deployment
 
 ## Architecture
 
@@ -40,8 +41,10 @@ src/app/
 ├── page.tsx                      # Landing page
 ├── login/ & signup/              # Auth pages
 ├── auth/callback/route.ts        # OAuth code exchange
+├── bookmarklet/                  # Tag picker UI (loaded in popup window)
 └── dashboard/                    # Protected — requires auth
-    ├── library/                  # List of saved posts (read/unread, search)
+    ├── page.tsx                  # Library view (search, tag filter, sort, pagination)
+    ├── settings/                 # X connection management, bookmarklet, RSS feed URL
     └── reader/[postId]/          # Distraction-free reading view
 ```
 
@@ -57,34 +60,41 @@ src/app/api/
 │   ├── callback/                 # X OAuth callback, store encrypted tokens
 │   ├── disconnect/               # Remove X connection
 │   └── save-post/                # Bookmarklet endpoint: URL → fetch → parse → store with tags
-└── posts/                        # Post management (mark read, delete)
+└── posts/                        # PATCH (mark read), PUT (re-fetch/refresh), DELETE
 ```
 
 ### Bookmarklet
 
-Iframe-based bookmarklet injects `/bookmarklet` page onto x.com. Shows a tag picker UI, then POSTs to `/api/x/save-post`. Auto-dismisses on save.
+Popup-window bookmarklet opens `/bookmarklet?url={encoded}` from x.com. Shows a tag picker UI, then POSTs to `/api/x/save-post`. Posts message back to parent to signal close.
 
 - `src/lib/bookmarklet.ts` — generates the bookmarklet JavaScript string with app URL baked in
-- `src/app/bookmarklet/page.tsx` — client-side tag picker UI loaded inside the iframe
+- `src/app/bookmarklet/page.tsx` — client-side tag picker with typeahead, keyboard navigation (arrows, enter, comma, backspace)
 
 ### Content Parsing Pipeline
 
 `src/lib/parser/` contains the content parsing pipeline:
 
-- `url.ts` — extract tweet ID from x.com/twitter.com URLs
+- `url.ts` — extract tweet ID from x.com/twitter.com URLs; also `extractArticleId()` for X Articles
 - `fetch-tweet.ts` — call X API v2 with user's OAuth token, requesting author + media expansions
-- `parse-tweet.ts` — transform raw API response into `ParsedContent` structured blocks
+- `parse-tweet.ts` — transform raw API response into `ParsedContent` structured blocks (text, image, heading)
 - `index.ts` — barrel export
 
-Pipeline: URL → extract post ID → fetch via X API v2 → parse into `{ author, handle, date, blocks }` → store raw + parsed in DB.
+Pipeline: URL → extract post ID → fetch via X API v2 → parse into `{ author, handle, profileImageUrl, date, blocks }` → generate LLM summary → store raw + parsed in DB.
 
-### RSS Feed
+**Article fetch strategy**: Regular user OAuth doesn't return X Article `article.plain_text`. If missing and `X_BEARER_TOKEN` env var exists, code retries with app bearer token and merges the article data into the user-level response.
 
-Token-authenticated RSS endpoint at `/api/feed/[token]` serves saved posts as RSS 2.0 XML with full content. Feed tokens are auto-created on first dashboard visit.
+### X OAuth Token Auto-Refresh
 
-- `src/components/FeedUrlCard.tsx` — displays feed URL with copy button on dashboard
+When X API returns 401 (expired token), the code automatically:
+1. Decrypts the stored refresh token
+2. Calls `refreshAccessToken()` (`lib/x-api/oauth.ts`)
+3. Re-encrypts new access + refresh tokens
+4. Updates DB with new tokens and expiry
+5. Retries the original API call
 
-### Supabase Auth Flow
+This pattern is implemented in `/api/x/save-post` and `/api/posts` (PUT). On refresh failure, returns user-facing message about reconnecting X account.
+
+### Supabase Client Patterns
 
 ```
 Request → middleware.ts → lib/supabase/middleware.ts (updateSession)
@@ -93,9 +103,14 @@ Request → middleware.ts → lib/supabase/middleware.ts (updateSession)
   └── /login or /signup with auth → redirect /dashboard
 ```
 
-Two Supabase clients:
+Three Supabase client types:
 - `lib/supabase/client.ts` — browser client for "use client" components
-- `lib/supabase/server.ts` — server client for server actions/components
+- `lib/supabase/server.ts` — server client for server actions/components (respects RLS)
+- **Admin client** — created inline in API routes with `SUPABASE_SERVICE_ROLE_KEY` to bypass RLS. Always imported locally (not at module level) to avoid bundling the service key.
+
+### LLM Summary Generation
+
+`lib/summarize.ts` uses `@anthropic-ai/sdk` with `claude-3-5-haiku-latest` (max 150 tokens) to generate 1-2 sentence summaries. Called after post save and on content refresh. Returns `null` on any failure — callers fall back to truncated text block preview. Gracefully degrades if `ANTHROPIC_API_KEY` is missing.
 
 ### Server Actions Pattern
 
@@ -106,9 +121,13 @@ Data mutations use co-located server actions (`actions.ts` files inside route fo
 All tables use RLS — users can only access their own data.
 
 - **users** — managed by Supabase Auth
-- **x_connections** — user_id (FK, unique), access_token (encrypted), refresh_token (encrypted), x_user_id, x_handle, token_expires_at (timestamptz), connected_at, updated_at
-- **saved_posts** — id, user_id (FK), x_post_id, x_post_url, author_name, author_handle, posted_at, saved_at, read_at (null = unread), tags (text[]), raw_api_response (JSONB), parsed_content (JSONB — structured blocks), title (text, nullable — article title), summary (text, nullable — LLM-generated 1-2 sentence summary). GIN index on tags.
-- **feed_tokens** — user_id (PK, FK), token (unique), created_at. One per user, auto-created on dashboard visit.
+- **x_connections** — user_id (FK, unique), access_token (encrypted), refresh_token (encrypted), x_handle, connected_at, token_expires_at
+- **saved_posts** — id, user_id (FK), x_post_id, x_post_url, author_name, author_handle, posted_at, saved_at, read_at (null = unread), tags (text[]), raw_api_response (JSONB), parsed_content (JSONB — structured blocks), title (text, nullable), summary (text, nullable — LLM-generated). GIN index on tags. Unique constraint on `(user_id, x_post_id)` — duplicates return 409.
+- **feed_tokens** — user_id (PK, FK), token (unique), created_at. One per user, auto-created on first settings page visit.
+
+### Encryption
+
+`lib/encryption.ts` — AES-256-GCM with 12-byte random IV. Stored format: `"{iv_hex}:{ciphertext_hex}:{authTag_hex}"`. Key from `TOKEN_ENCRYPTION_KEY` (must be 64-char hex = 32 bytes).
 
 ## Build Order
 
@@ -118,8 +137,8 @@ Implementation follows this sequence (from spec):
 2. ~~X OAuth connection flow — connect X account, store tokens securely~~ ✅
 3. ~~Bookmarklet + save endpoint — URL → post ID → fetch → store~~ ✅
 4. ~~Content parser — single posts and X Notes → clean JSON blocks~~ ✅
-5. Library view — list of saved posts, read/unread state, search
-6. Reader view — clean typographic display of parsed content
+5. ~~Library view — list of saved posts, read/unread state, search, tag filter, sort, pagination~~ ✅
+6. ~~Reader view — clean typographic display, scroll progress, read time, refresh~~ ✅
 
 ## Environment Variables
 
@@ -130,21 +149,27 @@ SUPABASE_SERVICE_ROLE_KEY         # Admin key (server-only, for DB writes past R
 NEXT_PUBLIC_X_CLIENT_ID           # X OAuth 2.0 client ID (same as Consumer Key)
 X_CLIENT_SECRET                   # X OAuth 2.0 secret (same as Consumer Secret, server-only)
 NEXT_PUBLIC_APP_URL               # App base URL (default: http://localhost:3001)
-TOKEN_ENCRYPTION_KEY              # 32-byte hex string for AES-256-GCM token encryption
+TOKEN_ENCRYPTION_KEY              # 64-char hex string for AES-256-GCM token encryption
+X_BEARER_TOKEN                    # App bearer token (optional, required for X Article content)
+ANTHROPIC_API_KEY                 # Anthropic API key (optional, enables LLM summaries)
+ALLOWED_SIGNUP_EMAILS             # Comma-separated whitelist (empty = open signup)
 ```
 
-Also in `.env.local`:
-- `X_CONSUMER_KEY` / `X_CONSUMER_SECRET` — X API v1.1 credentials
-- `X_BEARER_TOKEN` — App bearer token for X API v2 (required for article content fetching)
-- `ALLOWED_SIGNUP_EMAILS` — Comma-separated whitelist of emails allowed to sign up (empty = open signup)
-- `ANTHROPIC_API_KEY` — Anthropic API key for LLM-generated post summaries (Claude 3.5 Haiku)
-
 `NEXT_PUBLIC_*` vars are baked in at build time. `@/*` path alias maps to `./src/*`.
+
+## Gotchas
+
+- **Search queries are sanitized**: Parentheses and commas are stripped from search input to prevent breaking PostgREST `.or()` filter syntax.
+- **Heading detection is heuristic**: `isLikelyHeading()` in `parse-tweet.ts` checks line length < 80 chars and no trailing sentence punctuation. Not perfect for all content.
+- **Feed tokens auto-created on settings page visit**, not on signup.
+- **Cookie deletion in OAuth callback** wrapped in try/catch — some Next.js versions throw on cookie deletion.
+- **Bookmarklet blur delay**: 150ms delay before closing typeahead dropdown, allowing click on suggestion before it disappears.
+- **Fonts**: Three Google Fonts loaded in `layout.tsx` — Fraunces (serif display/headings), Plus Jakarta Sans (body), Newsreader (serif, loaded but not actively used).
 
 ## Design Rules
 
 - **Reader strips everything**: no like counts, retweet counts, reply prompts, related posts, engagement overlays
-- **Reader typography**: centered column ~65–70 chars wide, comfortable line height, light/dark mode
+- **Reader typography**: centered column ~65ch wide, comfortable line height, light/dark mode
 - **User-level OAuth**: each user's X requests hit their own rate limits, not the app's
 - **OAuth tokens encrypted at rest** in Postgres
 - **No social features**: private library only, no sharing between users
