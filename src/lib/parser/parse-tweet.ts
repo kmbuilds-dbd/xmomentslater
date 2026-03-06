@@ -92,10 +92,12 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
     }
   }
 
-  // Image blocks from media attachments
-  if (raw.includes?.media) {
+  // Image blocks from media actually attached to this tweet
+  const attachedKeys = raw.data.attachments?.media_keys;
+  if (attachedKeys?.length && raw.includes?.media) {
+    const attachedSet = new Set(attachedKeys);
     for (const media of raw.includes.media) {
-      if (media.type === "photo" && media.url) {
+      if (attachedSet.has(media.media_key) && media.type === "photo" && media.url) {
         blocks.push({ type: "image", content: media.url });
       }
     }
