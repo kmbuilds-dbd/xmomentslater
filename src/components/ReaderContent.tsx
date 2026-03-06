@@ -222,6 +222,15 @@ export function ReaderContent({
               <ExternalLink className="h-3.5 w-3.5" />
               Original
             </a>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1 hover:text-foreground transition-colors disabled:opacity-50"
+              title="Re-fetch content from X"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
 
           {/* Tags */}
@@ -241,38 +250,27 @@ export function ReaderContent({
 
         {/* Content blocks */}
         <article className="font-[family-name:var(--font-newsreader)] text-lg leading-relaxed space-y-6">
-          {needsRefresh && (
-            <div className="rounded-lg border border-dashed py-8 px-6 text-center font-sans">
-              {refreshError ? (
-                <>
-                  <p className="text-muted-foreground mb-4 text-sm">
-                    {refreshError}
-                  </p>
-                  <a
-                    href={xPostUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Read on X
-                  </a>
-                </>
-              ) : (
-                <>
-                  <p className="text-muted-foreground mb-3 text-sm">
-                    This post links to an X Article. Click refresh to fetch the full content.
-                  </p>
-                  <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                    {refreshing ? "Fetching…" : "Refresh content"}
-                  </button>
-                </>
-              )}
+          {refreshError && (
+            <div className="rounded-lg border border-dashed py-6 px-6 text-center font-sans">
+              <p className="text-muted-foreground mb-4 text-sm">
+                {refreshError}
+              </p>
+              <a
+                href={xPostUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Read on X
+              </a>
+            </div>
+          )}
+          {needsRefresh && !refreshError && (
+            <div className="rounded-lg border border-dashed py-6 px-6 text-center font-sans">
+              <p className="text-muted-foreground mb-3 text-sm">
+                This post links to an X Article. Click refresh above to fetch the full content.
+              </p>
             </div>
           )}
           {blocks.map((block, i) => {
