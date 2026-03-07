@@ -59,6 +59,19 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   // X Articles: parse plain_text into structured heading/paragraph blocks
   if (article?.plain_text?.trim()) {
     blocks = parseArticleBlocks(article.plain_text, article.title);
+
+    // Resolve article cover image from cover_media key
+    if (article.cover_media && raw.includes?.media) {
+      const coverMedia = raw.includes.media.find(
+        (m) => m.media_key === article.cover_media
+      );
+      const coverUrl = coverMedia?.url ?? coverMedia?.preview_image_url;
+      if (coverUrl) {
+        // Insert after title heading (index 1) or at start
+        const insertAt = blocks.length > 0 && blocks[0].type === "heading" ? 1 : 0;
+        blocks.splice(insertAt, 0, { type: "image", content: coverUrl });
+      }
+    }
   } else {
     // Regular tweets / X Notes: use note_tweet.text or data.text
     const originalText = raw.data.note_tweet?.text ?? raw.data.text ?? "";
@@ -92,13 +105,22 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
     }
   }
 
-  // Image blocks from media actually attached to this tweet
-  const attachedKeys = raw.data.attachments?.media_keys;
-  if (attachedKeys?.length && raw.includes?.media) {
-    const attachedSet = new Set(attachedKeys);
+  // Media blocks from attachments (photos, video thumbnails, GIF thumbnails)
+  if (raw.includes?.media) {
+    // Only include media that is actually attached to the tweet (not article cover)
+    const attachedKeys = new Set(raw.data.attachments?.media_keys ?? []);
+
     for (const media of raw.includes.media) {
-      if (attachedSet.has(media.media_key) && media.type === "photo" && media.url) {
+      // Skip media not attached to the tweet (e.g. article cover already handled above)
+      if (attachedKeys.size > 0 && !attachedKeys.has(media.media_key)) continue;
+
+      if (media.type === "photo" && media.url) {
         blocks.push({ type: "image", content: media.url });
+      } else if (
+        (media.type === "video" || media.type === "animated_gif") &&
+        media.preview_image_url
+      ) {
+        blocks.push({ type: "image", content: media.preview_image_url });
       }
     }
   }
