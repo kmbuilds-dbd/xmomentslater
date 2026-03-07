@@ -30,6 +30,7 @@ interface LibraryViewProps {
   currentTag: string;
   currentSort: string;
   currentSource: string;
+  currentShowRead: boolean;
   hasXConnection: boolean;
 }
 
@@ -43,6 +44,7 @@ export function LibraryView({
   currentTag,
   currentSort,
   currentSource,
+  currentShowRead,
   hasXConnection,
 }: LibraryViewProps) {
   const router = useRouter();
@@ -85,6 +87,7 @@ export function LibraryView({
         tag: currentTag,
         sort: currentSort,
         source: currentSource,
+        showRead: String(currentShowRead),
         page: String(currentPage),
       };
 
@@ -97,13 +100,14 @@ export function LibraryView({
       if (current.sort && current.sort !== "posted_desc")
         params.set("sort", current.sort);
       if (current.source) params.set("source", current.source);
+      if (current.showRead === "true") params.set("showRead", "true");
       if (current.page && current.page !== "1")
         params.set("page", current.page);
 
       const qs = params.toString();
       router.push(`/dashboard${qs ? `?${qs}` : ""}`, { scroll: false });
     },
-    [router, currentSearch, currentTag, currentSort, currentSource, currentPage]
+    [router, currentSearch, currentTag, currentSort, currentSource, currentShowRead, currentPage]
   );
 
   // Debounced search — fires 300ms after user stops typing
@@ -138,7 +142,7 @@ export function LibraryView({
   };
 
   const hasFilters =
-    currentSearch || currentTag || currentSort !== "posted_desc" || currentSource;
+    currentSearch || currentTag || currentSort !== "posted_desc" || currentSource || currentShowRead;
 
   return (
     <>
@@ -182,8 +186,8 @@ export function LibraryView({
         </button>
       </div>
 
-      {/* Source filter */}
-      <div className="flex gap-1.5 mb-4">
+      {/* Source filter + Show read toggle */}
+      <div className="flex items-center gap-1.5 mb-4">
         {[
           { value: "", label: "All" },
           { value: "manual", label: "Saved" },
@@ -201,6 +205,17 @@ export function LibraryView({
             {opt.label}
           </button>
         ))}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={currentShowRead}
+            onChange={(e) =>
+              updateParams({ showRead: String(e.target.checked), page: "1" })
+            }
+            className="rounded border-muted-foreground/50"
+          />
+          Show read
+        </label>
       </div>
 
       {/* Tag filters */}
