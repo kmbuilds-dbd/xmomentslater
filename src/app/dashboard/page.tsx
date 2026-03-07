@@ -39,6 +39,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const q = typeof params.q === "string" ? params.q.trim() : "";
   const tag = typeof params.tag === "string" ? params.tag.trim() : "";
   const sort = typeof params.sort === "string" ? params.sort : "posted_desc";
+  const showRead = typeof params.showRead === "string" ? params.showRead === "true" : false;
   const page = Math.max(
     1,
     parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1
@@ -73,6 +74,11 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Tag filter (posts containing this tag)
   if (tag) {
     query = query.contains("tags", [tag]);
+  }
+
+  // Hide read posts by default
+  if (!showRead) {
+    query = query.is("read_at", null);
   }
 
   // Sort order
@@ -155,6 +161,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         currentTag={tag}
         currentSort={sort}
         currentSource={source}
+        currentShowRead={showRead}
         hasXConnection={!!xConnection}
       />
     </main>
