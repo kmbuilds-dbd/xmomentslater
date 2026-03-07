@@ -91,6 +91,23 @@ export async function fetchTweet(
       if (retried.data.article?.plain_text) {
         // Merge: use article from bearer response, keep rest from user response
         result.data.article = retried.data.article;
+
+        // Also merge media includes (article cover images, inline media)
+        if (retried.includes?.media?.length) {
+          const existing = new Set(
+            result.includes?.media?.map((m) => m.media_key) ?? []
+          );
+          const newMedia = retried.includes.media.filter(
+            (m) => !existing.has(m.media_key)
+          );
+          if (newMedia.length) {
+            result.includes = result.includes ?? {};
+            result.includes.media = [
+              ...(result.includes.media ?? []),
+              ...newMedia,
+            ];
+          }
+        }
       }
     } catch (err) {
       console.error("Bearer token retry failed for article content:", err);
