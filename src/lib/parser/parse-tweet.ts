@@ -106,13 +106,11 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   }
 
   // Media blocks from attachments (photos, video thumbnails, GIF thumbnails)
-  if (raw.includes?.media) {
-    // Only include media that is actually attached to the tweet (not article cover)
-    const attachedKeys = new Set(raw.data.attachments?.media_keys ?? []);
-
+  const attachedKeys = raw.data.attachments?.media_keys;
+  if (attachedKeys?.length && raw.includes?.media) {
+    const attachedSet = new Set(attachedKeys);
     for (const media of raw.includes.media) {
-      // Skip media not attached to the tweet (e.g. article cover already handled above)
-      if (attachedKeys.size > 0 && !attachedKeys.has(media.media_key)) continue;
+      if (!attachedSet.has(media.media_key)) continue;
 
       if (media.type === "photo" && media.url) {
         blocks.push({ type: "image", content: media.url });
