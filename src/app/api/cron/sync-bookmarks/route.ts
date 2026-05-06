@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { decrypt, encrypt } from "@/lib/encryption";
 import { parseTweet, type XApiTweetResponse } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
-import { refreshAccessToken } from "@/lib/x-api/oauth";
-import { fetchBookmarks, type BookmarksResponse } from "@/lib/x-api/fetch-bookmarks";
+import { fetchBookmarks } from "@/lib/x-api/fetch-bookmarks";
+import { withTokenRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 export const maxDuration = 300; // 5 min max for Vercel
 
@@ -46,54 +45,28 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
 
     try {
-      let accessToken = decrypt(conn.access_token);
-
-      // Fetch bookmarks with automatic token refresh on 401
-      let page: BookmarksResponse;
       let pagesProcessed = 0;
       const maxPages = 2; // Cap at ~200 bookmarks per sync to respect rate limits
-
       let paginationToken: string | undefined;
 
       do {
-        try {
-          page = await fetchBookmarks(accessToken, conn.x_user_id, paginationToken);
-        } catch (err: unknown) {
-          // Refresh token on 401 and retry once
-          const errStatus = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : 0;
-          if (errStatus === 401 || errStatus === 403) {
-            console.log(`Token expired for user ${conn.user_id}, refreshing...`);
-            const refreshToken = decrypt(conn.refresh_token);
-            const newTokens = await refreshAccessToken(refreshToken);
-
-            await admin
-              .from("x_connections")
-              .update({
-                access_token: encrypt(newTokens.access_token),
-                refresh_token: encrypt(newTokens.refresh_token),
-                token_expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq("user_id", conn.user_id);
-
-            accessToken = newTokens.access_token;
-            page = await fetchBookmarks(accessToken, conn.x_user_id, paginationToken);
-          } else {
-            throw err;
-          }
-        }
+        const page = await withTokenRefresh(
+          (token) => fetchBookmarks(token, conn.x_user_id, paginationToken),
+          conn,
+          conn.user_id,
+          admin
+        );
 
         if (!page.data || page.data.length === 0) break;
 
-        // Process each bookmark
+        let newOnThisPage = 0;
+
         for (const tweet of page.data) {
-          // Build a single-tweet response shape for parseTweet
           const singleResponse: XApiTweetResponse = {
             data: tweet,
             includes: page.includes,
           };
 
-          // Check for duplicates
           const { data: existing } = await admin
             .from("saved_posts")
             .select("id")
@@ -106,17 +79,14 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Parse content
           const parsed = parseTweet(singleResponse);
 
-          // Extract title and text
           const title = parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
           const textContent = parsed.blocks
             .filter((b) => b.type === "text")
             .map((b) => b.content)
             .join("\n\n");
 
-          // Generate summary
           let summary: string | null = null;
           try {
             summary = await generateSummary(textContent, title ?? undefined);
@@ -124,12 +94,10 @@ export async function POST(request: NextRequest) {
             console.error(`Summary generation failed for tweet ${tweet.id}:`, err);
           }
 
-          // Build post URL from author info
           const author = page.includes?.users?.find((u) => u.id === tweet.author_id);
           const handle = author?.username ?? "unknown";
           const postUrl = `https://x.com/${handle}/status/${tweet.id}`;
 
-          // Insert
           const { error: insertError } = await admin
             .from("saved_posts")
             .insert({
@@ -149,7 +117,7 @@ export async function POST(request: NextRequest) {
             });
 
           if (insertError) {
-            // Unique constraint = already saved (race condition)
+            // 23505 = unique constraint, treat as duplicate (race with concurrent save)
             if (insertError.code === "23505") {
               skipped++;
             } else {
@@ -157,11 +125,16 @@ export async function POST(request: NextRequest) {
             }
           } else {
             synced++;
+            newOnThisPage++;
           }
         }
 
         paginationToken = page.meta?.next_token;
         pagesProcessed++;
+
+        // Bookmarks come newest-first; if no new posts on this page, older
+        // pages are guaranteed to also be all duplicates. Skip the next call.
+        if (newOnThisPage === 0) break;
       } while (paginationToken && pagesProcessed < maxPages);
 
       // Update last sync timestamp

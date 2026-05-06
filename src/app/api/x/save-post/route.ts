@@ -65,7 +65,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid X post URL" }, { status: 400 });
     }
 
-    // 4. Get user's X connection (encrypted tokens)
+    // Bail early on duplicates so we don't burn a user's X API rate-limit unit
+    // (and an Anthropic summary call) re-fetching content we already have.
+    const { data: existing } = await admin
+      .from("saved_posts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("x_post_id", postId)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({ error: "Post already saved" }, { status: 409 });
+    }
+
     const { data: connection } = await admin
       .from("x_connections")
       .select("access_token, refresh_token")
@@ -76,7 +88,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "X account not connected" }, { status: 400 });
     }
 
-    // 6. Fetch tweet — with automatic token refresh on 401
     let rawResponse;
     try {
       rawResponse = await fetchTweetWithRefresh({
