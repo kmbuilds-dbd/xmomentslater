@@ -10,6 +10,22 @@ export interface ParsedContent {
   blocks: Array<{ type: BlockType; content: string }>;
 }
 
+type Media = NonNullable<NonNullable<XApiTweetResponse["includes"]>["media"]>[number];
+type Block = ParsedContent["blocks"][number];
+
+function mediaToImageBlock(media: Media): Block | null {
+  if (media.type === "photo" && media.url) {
+    return { type: "image", content: media.url };
+  }
+  if (
+    (media.type === "video" || media.type === "animated_gif") &&
+    media.preview_image_url
+  ) {
+    return { type: "image", content: media.preview_image_url };
+  }
+  return null;
+}
+
 /**
  * Detect whether a line from article plain_text is likely a heading.
  * Headings are short lines that don't end with sentence punctuation.
@@ -53,23 +69,23 @@ function parseArticleBlocks(
 export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   const author = raw.includes?.users?.find((u) => u.id === raw.data.author_id);
   const article = raw.data.article;
+  const allMedia = raw.includes?.media ?? [];
+  const renderedMediaKeys = new Set<string>();
 
   let blocks: ParsedContent["blocks"] = [];
 
-  // X Articles: parse plain_text into structured heading/paragraph blocks
   if (article?.plain_text?.trim()) {
     blocks = parseArticleBlocks(article.plain_text, article.title);
 
-    // Resolve article cover image from cover_media key
-    if (article.cover_media && raw.includes?.media) {
-      const coverMedia = raw.includes.media.find(
+    if (article.cover_media) {
+      const coverMedia = allMedia.find(
         (m) => m.media_key === article.cover_media
       );
       const coverUrl = coverMedia?.url ?? coverMedia?.preview_image_url;
       if (coverUrl) {
-        // Insert after title heading (index 1) or at start
         const insertAt = blocks.length > 0 && blocks[0].type === "heading" ? 1 : 0;
         blocks.splice(insertAt, 0, { type: "image", content: coverUrl });
+        renderedMediaKeys.add(article.cover_media);
       }
     }
   } else {
@@ -105,20 +121,30 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
     }
   }
 
-  // Media blocks from attachments (photos, video thumbnails, GIF thumbnails)
   const attachedKeys = raw.data.attachments?.media_keys;
-  if (attachedKeys?.length && raw.includes?.media) {
+  if (attachedKeys?.length) {
     const attachedSet = new Set(attachedKeys);
-    for (const media of raw.includes.media) {
+    for (const media of allMedia) {
       if (!attachedSet.has(media.media_key)) continue;
+      if (renderedMediaKeys.has(media.media_key)) continue;
+      const block = mediaToImageBlock(media);
+      if (block) {
+        blocks.push(block);
+        renderedMediaKeys.add(media.media_key);
+      }
+    }
+  }
 
-      if (media.type === "photo" && media.url) {
-        blocks.push({ type: "image", content: media.url });
-      } else if (
-        (media.type === "video" || media.type === "animated_gif") &&
-        media.preview_image_url
-      ) {
-        blocks.push({ type: "image", content: media.preview_image_url });
+  // Article inline images: X API merges the bearer-only article media into
+  // includes.media but doesn't list them in attachments.media_keys, and
+  // plain_text drops the inline positions. Append the leftovers after the body.
+  if (article?.plain_text?.trim()) {
+    for (const media of allMedia) {
+      if (renderedMediaKeys.has(media.media_key)) continue;
+      const block = mediaToImageBlock(media);
+      if (block) {
+        blocks.push(block);
+        renderedMediaKeys.add(media.media_key);
       }
     }
   }

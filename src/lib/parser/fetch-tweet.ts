@@ -82,10 +82,12 @@ export async function fetchTweet(
 ): Promise<XApiTweetResponse> {
   const result = await fetchWithToken(postId, accessToken);
 
-  // If no article content returned and app bearer token is available, retry
-  // (article field requires app-level auth, not user OAuth)
+  // Only retry with the app bearer token when the tweet actually has an Article
+  // attached (`article` object present) but `plain_text` is missing — that field
+  // requires app-level auth. Skipping the retry for plain tweets (no `article`
+  // field at all) avoids burning the shared bearer rate limit on every save.
   const bearerToken = process.env.X_BEARER_TOKEN;
-  if (!result.data.article?.plain_text && bearerToken) {
+  if (result.data.article && !result.data.article.plain_text && bearerToken) {
     try {
       const retried = await fetchWithToken(postId, bearerToken);
       if (retried.data.article?.plain_text) {
