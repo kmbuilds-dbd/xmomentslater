@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { SavedPostCard } from "@/components/SavedPostCard";
 
 interface Post {
@@ -49,28 +48,6 @@ export function LibraryView({
 }: LibraryViewProps) {
   const router = useRouter();
   const [searchInput, setSearchInput] = useState(currentSearch);
-  const [refreshingAll, setRefreshingAll] = useState(false);
-
-  const handleRefreshAll = async () => {
-    setRefreshingAll(true);
-    try {
-      const res = await fetch("/api/posts/refresh-all", { method: "POST" });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(
-          `Refreshed ${data.refreshed} post${data.refreshed !== 1 ? "s" : ""}` +
-            (data.failed > 0 ? ` (${data.failed} failed)` : "")
-        );
-        router.refresh();
-      } else {
-        toast.error(data.error || "Failed to refresh posts");
-      }
-    } catch {
-      toast.error("Network error — check your connection");
-    } finally {
-      setRefreshingAll(false);
-    }
-  };
 
   // Sync search input when props change (after navigation)
   useEffect(() => {
@@ -175,15 +152,6 @@ export function LibraryView({
           <option value="saved_desc">Newest saved</option>
           <option value="unread">Unread first</option>
         </select>
-        <button
-          onClick={handleRefreshAll}
-          disabled={refreshingAll || totalCount === 0}
-          className="inline-flex items-center gap-1.5 text-sm py-2 px-3 rounded-md border bg-background hover:bg-secondary transition-colors disabled:opacity-50"
-          title="Re-fetch all posts from X"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshingAll ? "animate-spin" : ""}`} />
-          {refreshingAll ? "Refreshing…" : "Refresh All"}
-        </button>
       </div>
 
       {/* Source filter + Show read toggle */}

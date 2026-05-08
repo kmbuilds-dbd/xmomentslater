@@ -2,7 +2,7 @@ name: Sync X Bookmarks
 
 on:
   schedule:
-    - cron: '0 * * * *' # Every hour
+    - cron: '0 12 * * *' # Once a day at 12:00 UTC
   workflow_dispatch: {} # Manual trigger
 
 jobs:

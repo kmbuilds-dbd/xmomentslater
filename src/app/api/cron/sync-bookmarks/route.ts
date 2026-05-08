@@ -32,21 +32,34 @@ export async function POST(request: NextRequest) {
   // Fetch all users with X connections
   const { data: connections, error: connError } = await admin
     .from("x_connections")
-    .select("user_id, access_token, refresh_token, x_user_id");
+    .select("user_id, access_token, refresh_token, x_user_id, last_bookmark_sync_at");
 
   if (connError || !connections) {
     return NextResponse.json({ error: "Failed to fetch connections", details: connError }, { status: 500 });
   }
 
+  // Skip users synced within the last 23 hours — once-a-day is plenty
+  // and protects against duplicate cron triggers / manual re-runs.
+  const MIN_SYNC_INTERVAL_MS = 23 * 60 * 60 * 1000;
+  const now = Date.now();
+
   const results: Array<{ userId: string; synced: number; skipped: number; error?: string }> = [];
 
   for (const conn of connections) {
+    if (
+      conn.last_bookmark_sync_at &&
+      now - new Date(conn.last_bookmark_sync_at).getTime() < MIN_SYNC_INTERVAL_MS
+    ) {
+      results.push({ userId: conn.user_id, synced: 0, skipped: 0, error: "throttled" });
+      continue;
+    }
+
     let synced = 0;
     let skipped = 0;
 
     try {
       let pagesProcessed = 0;
-      const maxPages = 2; // Cap at ~200 bookmarks per sync to respect rate limits
+      const maxPages = 2; // First-sync catch-up; steady-state usually breaks after page 1
       let paginationToken: string | undefined;
 
       do {
@@ -59,6 +72,15 @@ export async function POST(request: NextRequest) {
 
         if (!page.data || page.data.length === 0) break;
 
+        // Batch the existence check: one query per page instead of N.
+        const tweetIds = page.data.map((t) => t.id);
+        const { data: existingRows } = await admin
+          .from("saved_posts")
+          .select("x_post_id")
+          .eq("user_id", conn.user_id)
+          .in("x_post_id", tweetIds);
+        const existingIds = new Set(existingRows?.map((r) => r.x_post_id) ?? []);
+
         let newOnThisPage = 0;
 
         for (const tweet of page.data) {
@@ -67,14 +89,7 @@ export async function POST(request: NextRequest) {
             includes: page.includes,
           };
 
-          const { data: existing } = await admin
-            .from("saved_posts")
-            .select("id")
-            .eq("user_id", conn.user_id)
-            .eq("x_post_id", tweet.id)
-            .maybeSingle();
-
-          if (existing) {
+          if (existingIds.has(tweet.id)) {
             skipped++;
             continue;
           }
