@@ -9,16 +9,21 @@ function getClient(): Anthropic | null {
   return _client;
 }
 
+// Below this length the summary would be roughly as long as the original,
+// so callers should fall back to the raw text and skip the API call.
+const SUMMARY_MIN_LENGTH = 280;
+
 /**
  * Generate a 1-2 sentence summary of post content using Claude.
- * Returns null on failure — callers should fall back to truncated text.
+ * Returns null on failure or for short content — callers should fall
+ * back to truncated text in that case.
  */
 export async function generateSummary(
   text: string,
   title?: string
 ): Promise<string | null> {
   const client = getClient();
-  if (!client || !text.trim()) return null;
+  if (!client || text.trim().length < SUMMARY_MIN_LENGTH) return null;
 
   try {
     const input = title ? `Title: ${title}\n\n${text}` : text;
