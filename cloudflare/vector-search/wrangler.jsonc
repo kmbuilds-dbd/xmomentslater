@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "xmomentslater-vector-search",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-24",
+  "vectorize": [
+    {
+      "binding": "POST_VECTORS",
+      "index_name": "xmomentslater-post-vectors"
+    }
+  ]
+}

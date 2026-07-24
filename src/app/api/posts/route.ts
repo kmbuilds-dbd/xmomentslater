@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import {
+  deleteSavedPostVector,
+  indexSavedPostVector,
+} from "@/lib/vector-search";
 import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 // PATCH — mark read / unread
@@ -71,7 +75,7 @@ export async function PUT(request: NextRequest) {
     // Fetch the existing post
     const { data: post } = await supabase
       .from("saved_posts")
-      .select("x_post_id, raw_api_response")
+      .select("x_post_id, raw_api_response, source, saved_at")
       .eq("id", id)
       .single();
 
@@ -146,6 +150,7 @@ export async function PUT(request: NextRequest) {
         posted_at: parsed.date,
         title,
         summary,
+        text_content: textContent || null,
       })
       .eq("id", id)
       .eq("user_id", user.id);
@@ -153,6 +158,21 @@ export async function PUT(request: NextRequest) {
     if (dbError) {
       console.error("Re-parse update error:", dbError);
       return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+    }
+
+    try {
+      await indexSavedPostVector({
+        postId: id,
+        userId: user.id,
+        xPostId: post.x_post_id,
+        text: textContent,
+        authorHandle: parsed.handle,
+        title,
+        source: post.source,
+        savedAt: post.saved_at,
+      });
+    } catch (err) {
+      console.error("Vector re-indexing failed:", err);
     }
 
     return NextResponse.json({ success: true, parsed });
@@ -199,6 +219,12 @@ export async function DELETE(request: NextRequest) {
     if (dbError) {
       console.error("Delete post error:", dbError);
       return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+    }
+
+    try {
+      await deleteSavedPostVector({ postId: id, userId: user.id });
+    } catch (err) {
+      console.error("Vector deletion failed:", err);
     }
 
     return NextResponse.json({ success: true });

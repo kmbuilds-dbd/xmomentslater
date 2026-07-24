@@ -19,6 +19,14 @@ interface Post {
   source: string;
 }
 
+type SearchMode = "keyword" | "semantic";
+
+interface SemanticSearchResponse {
+  posts?: Post[];
+  unavailable?: boolean;
+  error?: string;
+}
+
 interface LibraryViewProps {
   posts: Post[];
   allTags: string[];
@@ -48,6 +56,10 @@ export function LibraryView({
 }: LibraryViewProps) {
   const router = useRouter();
   const [searchInput, setSearchInput] = useState(currentSearch);
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword");
+  const [semanticPosts, setSemanticPosts] = useState<Post[]>(posts);
+  const [semanticLoading, setSemanticLoading] = useState(false);
+  const [semanticError, setSemanticError] = useState<string | null>(null);
 
   // Sync search input when props change (after navigation)
   useEffect(() => {
@@ -89,13 +101,75 @@ export function LibraryView({
 
   // Debounced search — fires 300ms after user stops typing
   useEffect(() => {
+    if (searchMode !== "keyword") return;
+
     const timer = setTimeout(() => {
       if (searchInput !== currentSearch) {
         updateParams({ q: searchInput, page: "1" });
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchInput, currentSearch, updateParams]);
+  }, [searchInput, currentSearch, searchMode, updateParams]);
+
+  useEffect(() => {
+    if (searchMode !== "semantic" || !searchInput.trim()) {
+      setSemanticPosts(posts);
+      setSemanticError(null);
+      setSemanticLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSemanticLoading(true);
+      setSemanticError(null);
+
+      try {
+        const params = new URLSearchParams({
+          q: searchInput.trim(),
+          showRead: String(currentShowRead),
+        });
+        if (currentTag) params.set("tag", currentTag);
+        if (currentSource) params.set("source", currentSource);
+
+        const response = await fetch(`/api/search/semantic?${params}`, {
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as SemanticSearchResponse;
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Search failed");
+        }
+
+        if (data.unavailable) {
+          setSemanticError("Semantic search is not configured.");
+          setSemanticPosts([]);
+        } else {
+          setSemanticPosts(data.posts ?? []);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setSemanticError(err instanceof Error ? err.message : "Search failed");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setSemanticLoading(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [
+    currentShowRead,
+    currentSource,
+    currentTag,
+    posts,
+    searchInput,
+    searchMode,
+  ]);
 
   const handleTagClick = (tag: string) => {
     updateParams({ tag: tag === currentTag ? "" : tag, page: "1" });
@@ -118,8 +192,15 @@ export function LibraryView({
     updateParams({ q: "", page: "1" });
   };
 
+  const visiblePosts = searchMode === "semantic" ? semanticPosts : posts;
+  const visibleTotalCount =
+    searchMode === "semantic" ? semanticPosts.length : totalCount;
   const hasFilters =
-    currentSearch || currentTag || currentSort !== "posted_desc" || currentSource || currentShowRead;
+    (searchMode === "semantic" ? searchInput : currentSearch) ||
+    currentTag ||
+    currentSort !== "posted_desc" ||
+    currentSource ||
+    currentShowRead;
 
   return (
     <>
@@ -142,6 +223,36 @@ export function LibraryView({
               <X className="h-4 w-4" />
             </button>
           )}
+        </div>
+        <div className="flex shrink-0 rounded-md border p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setSearchMode("keyword");
+              setSemanticError(null);
+            }}
+            className={`min-w-16 rounded px-2 py-1 transition-colors ${
+              searchMode === "keyword"
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Keyword
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchMode("semantic");
+              setSemanticError(null);
+            }}
+            className={`min-w-16 rounded px-2 py-1 transition-colors ${
+              searchMode === "semantic"
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Semantic
+          </button>
         </div>
         <select
           value={currentSort}
@@ -214,13 +325,19 @@ export function LibraryView({
       )}
 
       {/* Results */}
-      {posts.length > 0 ? (
+      {semanticLoading && searchMode === "semantic" && (
+        <p className="mb-3 text-sm text-muted-foreground">Searching semantically...</p>
+      )}
+      {semanticError && searchMode === "semantic" && (
+        <p className="mb-3 text-sm text-destructive">{semanticError}</p>
+      )}
+      {visiblePosts.length > 0 ? (
         <div className="space-y-3">
           <p className="text-sm font-medium text-muted-foreground">
-            {totalCount} post{totalCount !== 1 ? "s" : ""}
+            {visibleTotalCount} post{visibleTotalCount !== 1 ? "s" : ""}
             {hasFilters ? " found" : ""}
           </p>
-          {posts.map((post) => (
+          {visiblePosts.map((post) => (
             <SavedPostCard
               key={post.id}
               id={post.id}
@@ -238,7 +355,7 @@ export function LibraryView({
           ))}
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {searchMode === "keyword" && totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 pt-4">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}

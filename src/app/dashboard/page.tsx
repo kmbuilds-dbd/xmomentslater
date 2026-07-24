@@ -1,28 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { LibraryView } from "@/components/LibraryView";
+import {
+  mapSavedPostToLibraryPost,
+  type SavedPostRow,
+} from "@/lib/saved-posts";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
-
-interface ParsedContent {
-  blocks?: { type: string; content: string }[];
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getPreview(parsed: ParsedContent | null, raw?: any): string {
-  // Try parsed blocks first
-  if (parsed?.blocks) {
-    const textBlock = parsed.blocks.find((b) => b.type === "text");
-    if (textBlock?.content) return textBlock.content.slice(0, 200);
-  }
-  // Fallback: extract text directly from raw API response
-  if (raw?.data) {
-    const text = raw.data.note_tweet?.text ?? raw.data.text;
-    if (text) return text.slice(0, 200);
-  }
-  return "";
-}
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -121,23 +106,9 @@ export default async function DashboardPage({ searchParams }: Props) {
     .single();
 
   // Transform posts for the client component
-  const posts = (savedPosts ?? []).map((post) => ({
-    id: post.id,
-    authorName: post.author_name,
-    authorHandle: post.author_handle,
-    postedAt: post.posted_at,
-    savedAt: post.saved_at,
-    readAt: post.read_at,
-    tags: post.tags ?? [],
-    xPostUrl: post.x_post_url,
-    title: post.title as string | null,
-    preview: (post.summary as string | null) ??
-      getPreview(
-        post.parsed_content as ParsedContent | null,
-        post.raw_api_response
-      ),
-    source: (post.source as string) ?? "manual",
-  }));
+  const posts = (savedPosts ?? []).map((post) =>
+    mapSavedPostToLibraryPost(post as SavedPostRow)
+  );
 
   const totalCount = count ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);

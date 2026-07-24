@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { extractPostId, parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import { indexSavedPostVector } from "@/lib/vector-search";
 import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 export async function POST(request: NextRequest) {
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
         source: "manual",
         text_content: textContent || null,
       })
-      .select("id")
+      .select("id, saved_at")
       .single();
 
     if (dbError) {
@@ -151,6 +152,21 @@ export async function POST(request: NextRequest) {
       }
       console.error("DB insert error:", dbError);
       return NextResponse.json({ error: "Failed to save post" }, { status: 500 });
+    }
+
+    try {
+      await indexSavedPostVector({
+        postId: savedPost.id,
+        userId,
+        xPostId: postId,
+        text: textContent,
+        authorHandle: parsed.handle,
+        title,
+        source: "manual",
+        savedAt: savedPost.saved_at,
+      });
+    } catch (err) {
+      console.error("Vector indexing failed:", err);
     }
 
     return NextResponse.json({ success: true, postId: savedPost.id });

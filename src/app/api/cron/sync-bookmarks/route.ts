@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js";
 import { parseTweet, type XApiTweetResponse } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import { indexSavedPostVector } from "@/lib/vector-search";
 import { fetchBookmarks } from "@/lib/x-api/fetch-bookmarks";
 import { withTokenRefresh } from "@/lib/x-api/fetch-with-refresh";
 
@@ -85,7 +86,7 @@ async function syncUser(
         const handle = author?.username ?? "unknown";
         const postUrl = `https://x.com/${handle}/status/${tweet.id}`;
 
-        const { error: insertError } = await admin
+        const { data: insertedPost, error: insertError } = await admin
           .from("saved_posts")
           .insert({
             user_id: conn.user_id,
@@ -101,7 +102,9 @@ async function syncUser(
             summary,
             source: "bookmark",
             text_content: textContent || null,
-          });
+          })
+          .select("id, saved_at")
+          .single();
 
         if (insertError) {
           if (insertError.code === "23505") {
@@ -110,6 +113,20 @@ async function syncUser(
             console.error(`Insert error for tweet ${tweet.id}:`, insertError);
           }
         } else {
+          try {
+            await indexSavedPostVector({
+              postId: insertedPost.id,
+              userId: conn.user_id,
+              xPostId: tweet.id,
+              text: textContent,
+              authorHandle: parsed.handle,
+              title,
+              source: "bookmark",
+              savedAt: insertedPost.saved_at,
+            });
+          } catch (err) {
+            console.error(`Vector indexing failed for tweet ${tweet.id}:`, err);
+          }
           synced++;
           newOnThisPage++;
         }
