@@ -2,6 +2,8 @@
 
 Cloudflare Worker sidecar for semantic search over saved X posts. The Next.js app calls this Worker with a shared secret; the Worker calls OpenAI embeddings and stores/query vectors in Cloudflare Vectorize.
 
+Vector IDs use the saved post UUID. User ownership stays in Vectorize metadata through `user_id`, which is indexed for search filtering.
+
 ## Setup
 
 Create the Vectorize index for OpenAI `text-embedding-3-small`:

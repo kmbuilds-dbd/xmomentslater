@@ -25,10 +25,10 @@ Create a Cloudflare Worker under `cloudflare/vector-search`. It has:
 - A Vectorize binding, for example `POST_VECTORS`.
 - Routes for indexing, deletion, semantic query, and health checks.
 
-The Worker treats OpenAI embeddings as the model source and Cloudflare Vectorize as the vector database. The Vectorize record ID is deterministic:
+The Worker treats OpenAI embeddings as the model source and Cloudflare Vectorize as the vector database. The Vectorize record ID is deterministic and uses the saved post UUID:
 
 ```text
-${userId}:${postId}
+${postId}
 ```
 
 The vector metadata is intentionally small:

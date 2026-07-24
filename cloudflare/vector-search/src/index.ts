@@ -64,7 +64,8 @@ function json(body: unknown, status = 200): Response {
 }
 
 function vectorId(userId: string, postId: string): string {
-  return `${userId}:${postId}`;
+  void userId;
+  return postId;
 }
 
 function isAuthorized(request: Request, env: Env): boolean {

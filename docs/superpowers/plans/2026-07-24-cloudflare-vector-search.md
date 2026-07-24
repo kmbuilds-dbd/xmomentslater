@@ -14,7 +14,7 @@
 - Store only derived vectors and minimal metadata in Vectorize.
 - Browser must never call the Worker directly or receive Cloudflare/OpenAI secrets.
 - Use `Authorization: Bearer ${VECTOR_SEARCH_SECRET}` for Worker routes.
-- Use one deterministic vector ID per saved post: `${userId}:${postId}`.
+- Use one deterministic vector ID per saved post: `${postId}`.
 - Make indexing best-effort so save/sync/refresh/delete flows keep working if semantic indexing fails.
 - Refresh must persist regenerated `text_content` to fix stale keyword search.
 - Long post text is truncated for this phase; chunking is out of scope.
