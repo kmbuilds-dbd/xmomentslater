@@ -167,15 +167,15 @@ async function handleSearch(request: Request, env: Env): Promise<Response> {
 
   const values = await embed(query, env);
   const result = await env.POST_VECTORS.query(values, {
-    topK: Math.min(Math.max(body.limit ?? 20, 1), 50),
+    topK: Math.min(Math.max(body.limit ?? 20, 1), 100),
     filter: { user_id: body.userId },
-    returnMetadata: "all",
+    returnMetadata: "none",
   });
 
   return json({
     matches: result.matches
       .map((match) => ({
-        postId: String(match.metadata?.post_id ?? ""),
+        postId: match.id,
         score: match.score,
       }))
       .filter((match) => match.postId),

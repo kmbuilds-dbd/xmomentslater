@@ -192,9 +192,9 @@ export function LibraryView({
     updateParams({ q: "", page: "1" });
   };
 
-  const visiblePosts = searchMode === "semantic" ? semanticPosts : posts;
-  const visibleTotalCount =
-    searchMode === "semantic" ? semanticPosts.length : totalCount;
+  const semanticQueryActive = searchMode === "semantic" && !!searchInput.trim();
+  const visiblePosts = semanticQueryActive ? semanticPosts : posts;
+  const visibleTotalCount = semanticQueryActive ? semanticPosts.length : totalCount;
   const hasFilters =
     (searchMode === "semantic" ? searchInput : currentSearch) ||
     currentTag ||
@@ -325,10 +325,10 @@ export function LibraryView({
       )}
 
       {/* Results */}
-      {semanticLoading && searchMode === "semantic" && (
+      {semanticLoading && semanticQueryActive && (
         <p className="mb-3 text-sm text-muted-foreground">Searching semantically...</p>
       )}
-      {semanticError && searchMode === "semantic" && (
+      {semanticError && semanticQueryActive && (
         <p className="mb-3 text-sm text-destructive">{semanticError}</p>
       )}
       {visiblePosts.length > 0 ? (
@@ -355,7 +355,7 @@ export function LibraryView({
           ))}
 
           {/* Pagination */}
-          {searchMode === "keyword" && totalPages > 1 && (
+          {!semanticQueryActive && totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 pt-4">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}

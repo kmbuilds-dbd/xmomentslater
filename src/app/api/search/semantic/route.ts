@@ -9,7 +9,7 @@ import {
   searchSavedPostVectors,
 } from "@/lib/vector-search";
 
-const MAX_RESULTS = 20;
+const MAX_RESULTS = 100;
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
