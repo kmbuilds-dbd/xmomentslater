@@ -4,6 +4,7 @@ import { XConnectionCard } from "@/components/XConnectionCard";
 import { FeedUrlCard } from "@/components/FeedUrlCard";
 import { BookmarkletButton } from "@/components/BookmarkletButton";
 import { IOSShortcutCard } from "@/components/IOSShortcutCard";
+import { BookmarkSyncCard } from "@/components/BookmarkSyncCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
   // Fetch X connection
   const { data: xConnection } = await supabase
     .from("x_connections")
-    .select("x_handle")
+    .select("x_handle, last_bookmark_sync_at")
     .single();
 
   // Fetch or create feed token
@@ -62,6 +63,13 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-medium mb-3">X Account</h2>
         <XConnectionCard xHandle={xConnection?.x_handle ?? null} />
       </section>
+
+      {/* Bookmark sync */}
+      {xConnection && (
+        <section className="mb-8">
+          <BookmarkSyncCard lastSyncedAt={xConnection.last_bookmark_sync_at ?? null} />
+        </section>
+      )}
 
       {/* Bookmarklet */}
       {xConnection && (
