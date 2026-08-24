@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isAnthropicConfigured } from "@/lib/anthropic-client";
-import { generateTags, TAGS_MIN_LENGTH } from "@/lib/generate-tags";
+import { generateTagsDebug, TAGS_MIN_LENGTH } from "@/lib/generate-tags";
 import { isBackfillAdmin } from "@/lib/backfill-auth";
 
 /** A post counts as "missing tags" if it has none, or only the old generic
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
   let noText = 0;
   let tooShort = 0;
   let failed = 0;
+  let sampleError: string | null = null;
 
   for (const post of posts ?? []) {
     if (!needsTags(post.tags)) {
@@ -81,29 +82,25 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    try {
-      const tags = await generateTags(text, post.title ?? undefined);
-      if (!tags) {
-        // Config and length already checked above, so a null here means
-        // the API call itself failed — see server logs for the cause.
-        failed++;
-        continue;
-      }
-
-      const { error: updateError } = await supabase
-        .from("saved_posts")
-        .update({ tags })
-        .eq("id", post.id);
-
-      if (updateError) {
-        failed++;
-        console.error(`Tags backfill update failed for ${post.id}:`, updateError);
-      } else {
-        tagged++;
-      }
-    } catch (err) {
+    const { tags, error: tagError } = await generateTagsDebug(text, post.title ?? undefined);
+    if (!tags) {
       failed++;
-      console.error(`Tags backfill failed for ${post.id}:`, err);
+      if (tagError && !sampleError) sampleError = tagError;
+      console.error(`Tags backfill failed for ${post.id}: ${tagError}`);
+      continue;
+    }
+
+    const { error: updateError } = await supabase
+      .from("saved_posts")
+      .update({ tags })
+      .eq("id", post.id);
+
+    if (updateError) {
+      failed++;
+      if (!sampleError) sampleError = updateError.message;
+      console.error(`Tags backfill update failed for ${post.id}:`, updateError);
+    } else {
+      tagged++;
     }
   }
 
@@ -116,6 +113,7 @@ export async function POST(request: NextRequest) {
     noText,
     tooShort,
     failed,
+    sampleError,
     skipped: alreadyTagged + noText + tooShort,
     nextCursor: last?.saved_at ?? null,
   });
