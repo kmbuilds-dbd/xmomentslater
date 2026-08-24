@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,39 +12,96 @@ interface BookmarkSyncCardProps {
 
 type Status = "idle" | "syncing" | "done" | "error";
 
+// Safety bound on how many pages (of up to 100 bookmarks each) a single
+// click will pull, so one sync can't run away against X's rate limit.
+const MAX_PAGES_PER_SYNC = 20;
+
+interface SyncPageResponse {
+  success?: boolean;
+  synced?: number;
+  skipped?: number;
+  hasMore?: boolean;
+  nextPaginationToken?: string;
+  error?: string;
+}
+
 export function BookmarkSyncCard({ lastSyncedAt }: BookmarkSyncCardProps) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ page: number; synced: number } | null>(null);
   const [syncedAt, setSyncedAt] = useState(lastSyncedAt);
+  const cancelRef = useRef(false);
 
   const handleSync = async () => {
+    cancelRef.current = false;
     setStatus("syncing");
     setMessage(null);
+
+    let paginationToken: string | undefined;
+    let totalSynced = 0;
+    let totalSkipped = 0;
+    let page = 0;
+    let cappedByPageLimit = false;
+
     try {
-      const res = await fetch("/api/x/sync-bookmarks", { method: "POST" });
-      const data = await res.json();
+      do {
+        page++;
+        setProgress({ page, synced: totalSynced });
 
-      if (!res.ok) {
-        setMessage(data.error ?? "Failed to sync bookmarks");
-        setStatus("error");
-        return;
-      }
+        const res = await fetch("/api/x/sync-bookmarks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paginationToken }),
+        });
+        const data = (await res.json()) as SyncPageResponse;
 
-      setSyncedAt(new Date().toISOString());
+        if (!res.ok) {
+          setMessage(data.error ?? "Failed to sync bookmarks");
+          setStatus("error");
+          return;
+        }
+
+        totalSynced += data.synced ?? 0;
+        totalSkipped += data.skipped ?? 0;
+        setSyncedAt(new Date().toISOString());
+        setProgress({ page, synced: totalSynced });
+
+        if (cancelRef.current) break;
+
+        if (data.hasMore && data.nextPaginationToken) {
+          if (page >= MAX_PAGES_PER_SYNC) {
+            cappedByPageLimit = true;
+            break;
+          }
+          paginationToken = data.nextPaginationToken;
+        } else {
+          paginationToken = undefined;
+        }
+      } while (paginationToken);
+
+      const stoppedEarly = cancelRef.current;
       setMessage(
-        data.synced > 0
-          ? `Pulled ${data.synced} new bookmark${data.synced === 1 ? "" : "s"}.${
-              data.pagesCapped ? " More remain — sync again to keep going." : ""
-            }`
-          : "You're all caught up — no new bookmarks."
+        stoppedEarly
+          ? `Stopped early — pulled ${totalSynced} new bookmark${totalSynced === 1 ? "" : "s"}.`
+          : totalSynced > 0
+            ? `Pulled ${totalSynced} new bookmark${totalSynced === 1 ? "" : "s"}${
+                totalSkipped > 0 ? ` (${totalSkipped} already saved)` : ""
+              }.${cappedByPageLimit ? " More remain — sync again to keep going." : ""}`
+            : "You're all caught up — no new bookmarks."
       );
       setStatus("done");
       router.refresh();
     } catch {
-      setMessage("Network error. Please try again.");
+      setMessage(`Network error after ${totalSynced} synced. Please try again.`);
       setStatus("error");
+    } finally {
+      setProgress(null);
     }
+  };
+
+  const handleCancel = () => {
+    cancelRef.current = true;
   };
 
   return (
@@ -53,19 +110,29 @@ export function BookmarkSyncCard({ lastSyncedAt }: BookmarkSyncCardProps) {
         <div>
           <p className="text-sm font-medium">Bookmark sync</p>
           <p className="text-xs text-muted-foreground">
-            {syncedAt ? `Last synced ${formatTimeAgo(syncedAt)}` : "Never synced"}
+            {status === "syncing" && progress
+              ? `Syncing... page ${progress.page}, ${progress.synced} new so far`
+              : syncedAt
+                ? `Last synced ${formatTimeAgo(syncedAt)}`
+                : "Never synced"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSync}
-          disabled={status === "syncing"}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${status === "syncing" ? "animate-spin" : ""}`} />
-          {status === "syncing" ? "Syncing..." : "Sync now"}
-        </Button>
+        {status === "syncing" ? (
+          <Button variant="ghost" size="sm" onClick={handleCancel}>
+            Cancel
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={handleSync}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Sync now
+          </Button>
+        )}
       </div>
+      {status === "syncing" && (
+        <div className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-secondary">
+          <div className="h-full w-full animate-pulse rounded-full bg-primary" />
+        </div>
+      )}
       {message && (
         <p className={`text-xs mt-2.5 ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
           {message}
