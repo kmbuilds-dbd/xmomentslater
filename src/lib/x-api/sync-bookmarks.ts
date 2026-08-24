@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseTweet, type XApiTweetResponse } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import { generateTags } from "@/lib/generate-tags";
 import { indexSavedPostVector } from "@/lib/vector-search";
 import { fetchBookmarks, type BookmarksResponse } from "@/lib/x-api/fetch-bookmarks";
 import { withTokenRefresh } from "@/lib/x-api/fetch-with-refresh";
@@ -95,6 +96,16 @@ async function processBookmarkPage(
       console.error(`Summary generation failed for tweet ${tweet.id}:`, err);
     }
 
+    // Bookmarks have no user-picked tags, so auto-tag every one — the
+    // `source` column already distinguishes bookmarks from manual saves,
+    // so both tag slots go to real topics instead of a "bookmark" label.
+    let tags: string[] = [];
+    try {
+      tags = (await generateTags(textContent, title ?? undefined)) ?? [];
+    } catch (err) {
+      console.error(`Tag generation failed for tweet ${tweet.id}:`, err);
+    }
+
     const author = page.includes?.users?.find((u) => u.id === tweet.author_id);
     const handle = author?.username ?? "unknown";
     const postUrl = `https://x.com/${handle}/status/${tweet.id}`;
@@ -108,7 +119,7 @@ async function processBookmarkPage(
         author_name: parsed.author,
         author_handle: parsed.handle,
         posted_at: parsed.date,
-        tags: ["bookmark"],
+        tags,
         raw_api_response: singleResponse,
         parsed_content: parsed,
         title,

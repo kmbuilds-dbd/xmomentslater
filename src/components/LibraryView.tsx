@@ -29,6 +29,9 @@ interface SemanticSearchResponse {
 
 interface LibraryViewProps {
   posts: Post[];
+  /** Top tags by usage, surfaced as chips. */
+  topTags: string[];
+  /** Every distinct tag, alphabetical — backs the "more tags" search. */
   allTags: string[];
   totalCount: number;
   totalPages: number;
@@ -43,6 +46,7 @@ interface LibraryViewProps {
 
 export function LibraryView({
   posts,
+  topTags,
   allTags,
   totalCount,
   totalPages,
@@ -60,6 +64,9 @@ export function LibraryView({
   const [semanticPosts, setSemanticPosts] = useState<Post[]>(posts);
   const [semanticLoading, setSemanticLoading] = useState(false);
   const [semanticError, setSemanticError] = useState<string | null>(null);
+  const [tagQuery, setTagQuery] = useState("");
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [tagHighlightIndex, setTagHighlightIndex] = useState(-1);
 
   // Sync search input when props change (after navigation)
   useEffect(() => {
@@ -173,6 +180,39 @@ export function LibraryView({
 
   const handleTagClick = (tag: string) => {
     updateParams({ tag: tag === currentTag ? "" : tag, page: "1" });
+  };
+
+  // Always keep the active filter visible even if it's outside the top N —
+  // otherwise picking a rare tag from search would make it vanish from view.
+  const surfacedTags =
+    currentTag && !topTags.includes(currentTag) ? [currentTag, ...topTags] : topTags;
+
+  const tagSearchQuery = tagQuery.trim().toLowerCase();
+  const tagSuggestions = tagSearchQuery
+    ? allTags.filter((t) => t !== currentTag && t.includes(tagSearchQuery))
+    : [];
+
+  const selectTag = (tag: string) => {
+    handleTagClick(tag);
+    setTagQuery("");
+    setShowTagDropdown(false);
+    setTagHighlightIndex(-1);
+  };
+
+  const handleTagSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setTagHighlightIndex((prev) => (prev < tagSuggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setTagHighlightIndex((prev) => (prev > 0 ? prev - 1 : tagSuggestions.length - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = tagHighlightIndex >= 0 ? tagSuggestions[tagHighlightIndex] : tagSuggestions[0];
+      if (pick) selectTag(pick);
+    } else if (e.key === "Escape") {
+      setShowTagDropdown(false);
+    }
   };
 
   const handleSourceChange = (source: string) => {
@@ -297,10 +337,10 @@ export function LibraryView({
         </label>
       </div>
 
-      {/* Tag filters */}
+      {/* Tag filters — most-used tags surfaced as chips, the rest searchable */}
       {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {allTags.map((tag) => (
+        <div className="flex flex-wrap items-center gap-1.5 mb-4">
+          {surfacedTags.map((tag) => (
             <button
               key={tag}
               onClick={() => handleTagClick(tag)}
@@ -320,6 +360,42 @@ export function LibraryView({
             >
               Clear filter
             </button>
+          )}
+          {allTags.length > topTags.length && (
+            <div className="relative">
+              <input
+                type="text"
+                value={tagQuery}
+                onChange={(e) => {
+                  setTagQuery(e.target.value);
+                  setShowTagDropdown(true);
+                  setTagHighlightIndex(-1);
+                }}
+                onKeyDown={handleTagSearchKeyDown}
+                onFocus={() => tagQuery && setShowTagDropdown(true)}
+                onBlur={() => setTimeout(() => setShowTagDropdown(false), 150)}
+                placeholder="More tags..."
+                className="text-xs px-2.5 py-1 w-24 focus:w-36 rounded-full border bg-background focus:outline-none focus:ring-1 focus:ring-ring transition-all"
+              />
+              {showTagDropdown && tagSuggestions.length > 0 && (
+                <div className="absolute left-0 top-full mt-1 min-w-[9rem] bg-popover border rounded-md shadow-lg overflow-hidden z-50">
+                  {tagSuggestions.slice(0, 8).map((tag, i) => (
+                    <button
+                      key={tag}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectTag(tag)}
+                      className={`w-full text-left text-xs px-3 py-1.5 transition-colors ${
+                        i === tagHighlightIndex
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent/50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { extractPostId, parseTweet } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
+import { generateTags } from "@/lib/generate-tags";
 import { indexSavedPostVector } from "@/lib/vector-search";
 import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
@@ -124,6 +125,17 @@ export async function POST(request: NextRequest) {
       console.error("Summary generation failed:", err);
     }
 
+    // Auto-tag only if the user didn't pick any tags themselves — never
+    // override an explicit (even empty-seeming) choice they made.
+    let finalTags = tags;
+    if (finalTags.length === 0) {
+      try {
+        finalTags = (await generateTags(textContent, title ?? undefined)) ?? [];
+      } catch (err) {
+        console.error("Tag generation failed:", err);
+      }
+    }
+
     // 9. Store in database
     const { data: savedPost, error: dbError } = await admin
       .from("saved_posts")
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
         author_name: parsed.author,
         author_handle: parsed.handle,
         posted_at: parsed.date,
-        tags,
+        tags: finalTags,
         raw_api_response: rawResponse,
         parsed_content: parsed,
         title,

@@ -1,13 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-let _client: Anthropic | null = null;
-
-function getClient(): Anthropic | null {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  if (!_client) _client = new Anthropic({ apiKey });
-  return _client;
-}
+import { getAnthropicClient } from "@/lib/anthropic-client";
 
 // Below this length the summary would be roughly as long as the original,
 // so callers should fall back to the raw text and skip the API call.
@@ -22,7 +13,7 @@ export async function generateSummary(
   text: string,
   title?: string
 ): Promise<string | null> {
-  const client = getClient();
+  const client = getAnthropicClient();
   if (!client || text.trim().length < SUMMARY_MIN_LENGTH) return null;
 
   try {

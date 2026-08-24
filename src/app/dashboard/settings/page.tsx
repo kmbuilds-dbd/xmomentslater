@@ -5,7 +5,9 @@ import { FeedUrlCard } from "@/components/FeedUrlCard";
 import { BookmarkletButton } from "@/components/BookmarkletButton";
 import { IOSShortcutCard } from "@/components/IOSShortcutCard";
 import { BookmarkSyncCard } from "@/components/BookmarkSyncCard";
+import { TagBackfillCard } from "@/components/TagBackfillCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
+import { isBackfillAdmin } from "@/lib/backfill-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +103,14 @@ export default async function SettingsPage() {
           <FeedUrlCard
             feedUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/api/feed/${feedToken}`}
           />
+        </section>
+      )}
+
+      {/* Admin-only maintenance actions */}
+      {isBackfillAdmin(user?.email) && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium mb-3">Maintenance</h2>
+          <TagBackfillCard />
         </section>
       )}
     </main>
