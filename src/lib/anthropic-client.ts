@@ -11,3 +11,7 @@ export function getAnthropicClient(): Anthropic | null {
   }
   return _client;
 }
+
+export function isAnthropicConfigured(): boolean {
+  return getAnthropicClient() !== null;
+}

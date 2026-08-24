@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateTags } from "@/lib/generate-tags";
+import { isAnthropicConfigured } from "@/lib/anthropic-client";
+import { generateTags, TAGS_MIN_LENGTH } from "@/lib/generate-tags";
 import { isBackfillAdmin } from "@/lib/backfill-auth";
 
 /** A post counts as "missing tags" if it has none, or only the old generic
@@ -8,8 +9,9 @@ import { isBackfillAdmin } from "@/lib/backfill-auth";
  * distinguishes bookmarks from manual saves, so that tag carried no
  * real information). Anything the user actually tagged is left alone. */
 function needsTags(tags: string[] | null): boolean {
-  if (!tags || tags.length === 0) return true;
-  return tags.length === 1 && tags[0] === "bookmark";
+  if (!tags) return true;
+  const normalized = tags.map((t) => t.trim().toLowerCase()).filter(Boolean);
+  return normalized.length === 0 || (normalized.length === 1 && normalized[0] === "bookmark");
 }
 
 // POST — walk existing saved_posts and assign two topical tags to any post
@@ -27,6 +29,15 @@ export async function POST(request: NextRequest) {
 
   if (!isBackfillAdmin(user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Fail fast and say so, instead of quietly "succeeding" with 0 tagged —
+  // generateTags degrades to null with no error when this is missing.
+  if (!isAnthropicConfigured()) {
+    return NextResponse.json(
+      { error: "Tag generation isn't configured: ANTHROPIC_API_KEY is missing on the server." },
+      { status: 503 }
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -50,19 +61,32 @@ export async function POST(request: NextRequest) {
   }
 
   let tagged = 0;
-  let skipped = 0;
+  let alreadyTagged = 0;
+  let noText = 0;
+  let tooShort = 0;
   let failed = 0;
 
   for (const post of posts ?? []) {
-    if (!needsTags(post.tags) || !post.text_content?.trim()) {
-      skipped++;
+    if (!needsTags(post.tags)) {
+      alreadyTagged++;
+      continue;
+    }
+    const text = post.text_content?.trim() ?? "";
+    if (!text) {
+      noText++;
+      continue;
+    }
+    if (text.length < TAGS_MIN_LENGTH) {
+      tooShort++;
       continue;
     }
 
     try {
-      const tags = await generateTags(post.text_content, post.title ?? undefined);
+      const tags = await generateTags(text, post.title ?? undefined);
       if (!tags) {
-        skipped++;
+        // Config and length already checked above, so a null here means
+        // the API call itself failed — see server logs for the cause.
+        failed++;
         continue;
       }
 
@@ -88,8 +112,11 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     success: true,
     tagged,
-    skipped,
+    alreadyTagged,
+    noText,
+    tooShort,
     failed,
+    skipped: alreadyTagged + noText + tooShort,
     nextCursor: last?.saved_at ?? null,
   });
 }

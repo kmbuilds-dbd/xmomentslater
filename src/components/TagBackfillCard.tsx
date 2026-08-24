@@ -10,7 +10,9 @@ type Status = "idle" | "running" | "done" | "error";
 interface BackfillResponse {
   success?: boolean;
   tagged?: number;
-  skipped?: number;
+  alreadyTagged?: number;
+  noText?: number;
+  tooShort?: number;
   failed?: number;
   nextCursor?: string | null;
   error?: string;
@@ -30,6 +32,9 @@ export function TagBackfillCard() {
 
     let cursor: string | undefined;
     let totalTagged = 0;
+    let totalAlreadyTagged = 0;
+    let totalNoText = 0;
+    let totalTooShort = 0;
     let totalFailed = 0;
     let batch = 0;
 
@@ -52,18 +57,27 @@ export function TagBackfillCard() {
         }
 
         totalTagged += data.tagged ?? 0;
+        totalAlreadyTagged += data.alreadyTagged ?? 0;
+        totalNoText += data.noText ?? 0;
+        totalTooShort += data.tooShort ?? 0;
         totalFailed += data.failed ?? 0;
         setProgress({ batch, tagged: totalTagged });
 
         cursor = cancelRef.current ? undefined : data.nextCursor ?? undefined;
       } while (cursor);
 
+      const breakdown = [
+        totalAlreadyTagged > 0 ? `${totalAlreadyTagged} already tagged` : null,
+        totalNoText > 0 ? `${totalNoText} had no text` : null,
+        totalTooShort > 0 ? `${totalTooShort} too short to tag` : null,
+        totalFailed > 0 ? `${totalFailed} failed — check server logs` : null,
+      ].filter(Boolean);
+
       setMessage(
-        cancelRef.current
+        (cancelRef.current
           ? `Stopped early — tagged ${totalTagged} post${totalTagged === 1 ? "" : "s"}.`
-          : `Done — tagged ${totalTagged} post${totalTagged === 1 ? "" : "s"}.${
-              totalFailed > 0 ? ` ${totalFailed} failed, check logs.` : ""
-            }`
+          : `Done — tagged ${totalTagged} post${totalTagged === 1 ? "" : "s"}.`) +
+          (breakdown.length ? ` (${breakdown.join(", ")})` : "")
       );
       setStatus("done");
       router.refresh();
