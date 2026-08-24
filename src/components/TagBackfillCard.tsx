@@ -14,6 +14,7 @@ interface BackfillResponse {
   noText?: number;
   tooShort?: number;
   failed?: number;
+  sampleError?: string | null;
   nextCursor?: string | null;
   error?: string;
 }
@@ -36,6 +37,7 @@ export function TagBackfillCard() {
     let totalNoText = 0;
     let totalTooShort = 0;
     let totalFailed = 0;
+    let sampleError: string | null = null;
     let batch = 0;
 
     try {
@@ -61,6 +63,7 @@ export function TagBackfillCard() {
         totalNoText += data.noText ?? 0;
         totalTooShort += data.tooShort ?? 0;
         totalFailed += data.failed ?? 0;
+        if (data.sampleError && !sampleError) sampleError = data.sampleError;
         setProgress({ batch, tagged: totalTagged });
 
         cursor = cancelRef.current ? undefined : data.nextCursor ?? undefined;
@@ -70,7 +73,9 @@ export function TagBackfillCard() {
         totalAlreadyTagged > 0 ? `${totalAlreadyTagged} already tagged` : null,
         totalNoText > 0 ? `${totalNoText} had no text` : null,
         totalTooShort > 0 ? `${totalTooShort} too short to tag` : null,
-        totalFailed > 0 ? `${totalFailed} failed — check server logs` : null,
+        totalFailed > 0
+          ? `${totalFailed} failed${sampleError ? `: ${sampleError}` : " — check server logs"}`
+          : null,
       ].filter(Boolean);
 
       setMessage(

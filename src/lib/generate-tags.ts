@@ -27,17 +27,28 @@ function parseTagArray(raw: string): string[] | null {
   }
 }
 
+export interface TagsDebugResult {
+  tags: string[] | null;
+  /** Present whenever tags is null — why generation didn't produce any. */
+  error?: string;
+}
+
 /**
- * Generate exactly two short topical tags for a post's content using
- * Claude. Returns null on failure, missing API key, or content too short
- * to reliably tag — callers should leave the post untagged in that case.
+ * Same as generateTags() below, but reports *why* it came back empty
+ * instead of swallowing the reason. Used by the admin tag backfill, where
+ * "0 tagged" needs to be distinguishable from a bad API key, a model
+ * response that ignored the format, and every other failure mode — they
+ * all used to look identical from the outside.
  */
-export async function generateTags(
+export async function generateTagsDebug(
   text: string,
   title?: string
-): Promise<string[] | null> {
+): Promise<TagsDebugResult> {
   const client = getAnthropicClient();
-  if (!client || text.trim().length < TAGS_MIN_LENGTH) return null;
+  if (!client) return { tags: null, error: "ANTHROPIC_API_KEY not configured" };
+  if (text.trim().length < TAGS_MIN_LENGTH) {
+    return { tags: null, error: "content too short to tag" };
+  }
 
   try {
     const input = title ? `Title: ${title}\n\n${text}` : text;
@@ -54,10 +65,37 @@ export async function generateTags(
     });
 
     const block = message.content[0];
-    if (block.type !== "text") return null;
-    return parseTagArray(block.text.trim());
+    if (block.type !== "text") {
+      return { tags: null, error: `unexpected response content type: ${block.type}` };
+    }
+
+    const tags = parseTagArray(block.text.trim());
+    if (!tags) {
+      return {
+        tags: null,
+        error: `couldn't parse tags from response: ${JSON.stringify(block.text.slice(0, 200))}`,
+      };
+    }
+    return { tags };
   } catch (err) {
-    console.error("Tag generation failed:", err);
-    return null;
+    return { tags: null, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Generate exactly two short topical tags for a post's content using
+ * Claude. Returns null on failure, missing API key, or content too short
+ * to reliably tag — callers should leave the post untagged in that case.
+ */
+const EXPECTED_SKIP_REASONS = ["ANTHROPIC_API_KEY not configured", "content too short to tag"];
+
+export async function generateTags(
+  text: string,
+  title?: string
+): Promise<string[] | null> {
+  const { tags, error } = await generateTagsDebug(text, title);
+  if (error && !EXPECTED_SKIP_REASONS.includes(error)) {
+    console.error("Tag generation failed:", error);
+  }
+  return tags;
 }
