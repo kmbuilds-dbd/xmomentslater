@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xMomentsLater extension settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">XMomentsLater</p>
+      <h1>Where should saved posts go?</h1>
+      <p class="intro">The extension opens this app’s familiar tag picker in a small window beside X.</p>
+      <form id="settings-form">
+        <label for="app-url">xMomentsLater URL</label>
+        <input id="app-url" name="app-url" type="url" required spellcheck="false" />
+        <p class="hint">Use <code>http://localhost:3001</code> locally, or your deployed HTTPS address.</p>
+        <button type="submit">Save settings</button>
+        <p id="status" aria-live="polite"></p>
+      </form>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

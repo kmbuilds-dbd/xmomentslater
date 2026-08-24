@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "xMomentsLater for X",
+  "description": "Add a Save to xMomentsLater button beside X's bookmark button.",
+  "version": "0.1.0",
+  "permissions": ["storage", "windows"],
+  "content_scripts": [
+    {
+      "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "options_page": "options.html"
+}

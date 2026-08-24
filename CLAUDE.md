@@ -174,3 +174,20 @@ ALLOWED_SIGNUP_EMAILS             # Comma-separated whitelist (empty = open sign
 - **OAuth tokens encrypted at rest** in Postgres
 - **No social features**: private library only, no sharing between users
 - **v1 content scope**: single posts, X Notes, posts with images. Threads are post-v1.
+
+## Design Context
+
+### Users
+People reading X who want to capture a post without being pulled further into the feed. Their immediate job is to open the familiar tag picker from the exact post they are reading, then return to X; later, they read in a private library.
+
+### Brand Personality
+Quiet, considered, and dependable. xMomentsLater should feel like a calm place set apart from X's attention-seeking environment.
+
+### Aesthetic Direction
+Warm, typographic, and deliberately low-distraction. The extension control belongs visually in X's compact action row, while its small terracotta bookmark detail identifies the destination without competing with X's own actions. Respect the user's X light or dark theme and reduced-motion preference.
+
+### Design Principles
+- Keep saving a post to a single obvious action.
+- Reuse the app's tag picker and save pipeline rather than creating a second workflow.
+- Make the injected control accessible by name, keyboard, and focus state.
+- Never obscure post content or interfere with X's native controls.

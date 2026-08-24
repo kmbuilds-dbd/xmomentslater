@@ -87,6 +87,10 @@ xMomentsLater fixes that. One-click save via bookmarklet, private library, clean
 3. Navigate to any post on x.com and click the bookmarklet.
 4. Optionally add tags, then hit Save.
 
+### Using the Chrome Extension
+
+The [`extension`](./extension) folder contains a Manifest V3 Chrome extension. Load it unpacked from `chrome://extensions`, then set its xMomentsLater URL in **Extension options**. On any X or Twitter post, it adds a checked bookmark icon directly after X's native bookmark button. It opens the same tag picker and save flow as the bookmarklet.
+
 ## Project Structure
 
 ```
