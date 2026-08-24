@@ -3,7 +3,7 @@ import { getAnthropicClient } from "@/lib/anthropic-client";
 
 // Below this length there usually isn't enough signal to pick a real topic
 // from (a one-line post, a link with no commentary, ...).
-const TAGS_MIN_LENGTH = 40;
+export const TAGS_MIN_LENGTH = 40;
 
 function parseTagArray(raw: string): string[] | null {
   // Claude is asked for a bare JSON array but may still wrap it in prose or
