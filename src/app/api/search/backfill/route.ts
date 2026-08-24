@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { indexSavedPostVector } from "@/lib/vector-search";
+import { isBackfillAdmin } from "@/lib/backfill-auth";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -12,12 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const adminEmails = (process.env.SEMANTIC_BACKFILL_ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (!user.email || !adminEmails.includes(user.email.toLowerCase())) {
+  if (!isBackfillAdmin(user.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

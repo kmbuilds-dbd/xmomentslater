@@ -86,18 +86,25 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const { data: savedPosts, count } = await query;
 
-  // Fetch all user tags for the filter UI
+  // Fetch all user tags for the filter UI, counted so we can surface the
+  // most-used ones and leave the long tail searchable instead of cluttering
+  // the bar (auto-tagging means most users end up with dozens of tags).
   const { data: tagRows } = await supabase
     .from("saved_posts")
     .select("tags");
 
-  const tagSet = new Set<string>();
+  const tagCounts = new Map<string, number>();
   for (const row of tagRows ?? []) {
     for (const t of row.tags ?? []) {
-      tagSet.add(t);
+      tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
     }
   }
-  const allTags = [...tagSet].sort();
+  const allTags = [...tagCounts.keys()].sort();
+  const TOP_TAGS_COUNT = 10;
+  const topTags = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, TOP_TAGS_COUNT)
+    .map(([tag]) => tag);
 
   // Check if X is connected (for empty state message)
   const { data: xConnection } = await supabase
@@ -124,6 +131,7 @@ export default async function DashboardPage({ searchParams }: Props) {
 
       <LibraryView
         posts={posts}
+        topTags={topTags}
         allTags={allTags}
         totalCount={totalCount}
         totalPages={totalPages}
