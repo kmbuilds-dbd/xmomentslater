@@ -147,3 +147,9 @@ X Notes return as HTML/markdown from the API and are straightforward to render. 
 ## Name
 
 **xMomentsLater** — a nod to "read later" and the idea of capturing a moment worth returning to, without the noise.
+
+## IFTTT capture (October 2026)
+
+An optional likes-to-library path accepts IFTTT-delivered text via `/api/ifttt/ingest`, using the existing per-user feed Bearer token. It does not fetch X or require an X connection. Saves are idempotent by user and X post ID; optional one-call AI enrichment generates summary, topical tags and a broad category. Source `ifttt` is filterable in the library. Original text remains readable when enrichment or vector indexing fails. Reader refresh is unavailable for these posts to avoid X API requests. Full Notes/Articles and images are limited by IFTTT's supplied ingredients.
+
+Setup and rollout: `docs/ifttt.md`. Scheduled bookmark sync is disabled; manual capture and sync remain available. Existing posts are not recategorized by this change.

@@ -83,6 +83,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    if (post.source === "ifttt") {
+      return NextResponse.json({ error: "IFTTT posts cannot be refreshed from X. Open the original post instead." }, { status: 400 });
+    }
+
     // Get X connection tokens (including refresh_token for auto-refresh)
     const { data: connection } = await supabase
       .from("x_connections")

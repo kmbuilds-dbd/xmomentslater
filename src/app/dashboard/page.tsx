@@ -36,12 +36,12 @@ export default async function DashboardPage({ searchParams }: Props) {
   let query = supabase
     .from("saved_posts")
     .select(
-      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source",
+      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category",
       { count: "exact" }
     );
 
   // Source filter (manual vs bookmark)
-  if (source === "manual" || source === "bookmark") {
+  if (source === "manual" || source === "bookmark" || source === "ifttt") {
     query = query.eq("source", source);
   }
 

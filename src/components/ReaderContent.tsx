@@ -16,6 +16,8 @@ interface ParsedContent {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ReaderContentProps {
   postId: string;
+  source?: string;
+  category?: string | null;
   authorName: string | null;
   authorHandle: string | null;
   postedAt: string | null;
@@ -107,6 +109,8 @@ function isContentJustUrl(blocks: ParsedContent["blocks"]): boolean {
 
 export function ReaderContent({
   postId,
+  source,
+  category,
   authorName,
   authorHandle,
   postedAt,
@@ -222,7 +226,8 @@ export function ReaderContent({
               <ExternalLink className="h-3.5 w-3.5" />
               Original
             </a>
-            <button
+            {source !== "ifttt" && (
+              <button
               onClick={handleRefresh}
               disabled={refreshing}
               className="inline-flex items-center gap-1 hover:text-foreground transition-colors disabled:opacity-50"
@@ -230,8 +235,12 @@ export function ReaderContent({
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
+              </button>
+            )}
           </div>
+
+          {category && <p className="text-xs text-muted-foreground mt-3 capitalize">{category}</p>}
+          {source === "ifttt" && <p className="text-xs text-muted-foreground mt-3">Saved via IFTTT. Text may be shortened; images are not included. Open Original for the full post.</p>}
 
           {/* Tags */}
           {tags.length > 0 && (
@@ -266,7 +275,7 @@ export function ReaderContent({
               </a>
             </div>
           )}
-          {needsRefresh && !refreshError && (
+          {needsRefresh && !refreshError && source !== "ifttt" && (
             <div className="rounded-lg border border-dashed py-6 px-6 text-center font-sans">
               <p className="text-muted-foreground mb-3 text-sm">
                 This post links to an X Article. Click refresh above to fetch the full content.

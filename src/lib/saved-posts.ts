@@ -16,6 +16,7 @@ export interface SavedPostRow {
   summary: string | null;
   title: string | null;
   source: string | null;
+  category: string | null;
 }
 
 export interface LibraryPost {
@@ -30,6 +31,7 @@ export interface LibraryPost {
   title: string | null;
   preview: string;
   source: string;
+  category: string | null;
 }
 
 function getRawText(raw: unknown): string {
@@ -58,5 +60,6 @@ export function mapSavedPostToLibraryPost(post: SavedPostRow): LibraryPost {
     title: post.title,
     preview: post.summary ?? getPreview(post.parsed_content, post.raw_api_response),
     source: post.source ?? "manual",
+    category: post.category ?? null,
   };
 }

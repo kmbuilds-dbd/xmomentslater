@@ -17,6 +17,7 @@ interface Post {
   title: string | null;
   preview: string;
   source: string;
+  category: string | null;
 }
 
 type SearchMode = "keyword" | "semantic";
@@ -311,6 +312,7 @@ export function LibraryView({
           { value: "", label: "All" },
           { value: "manual", label: "Saved" },
           { value: "bookmark", label: "Bookmarked" },
+          { value: "ifttt", label: "Liked via IFTTT" },
         ].map((opt) => (
           <button
             key={opt.value}
@@ -427,6 +429,7 @@ export function LibraryView({
               title={post.title}
               preview={post.preview}
               source={post.source}
+              category={post.category}
             />
           ))}
 
@@ -473,8 +476,8 @@ export function LibraryView({
               </p>
               <p className="text-sm text-muted-foreground">
                 {hasXConnection
-                  ? "Use the bookmarklet to save posts from X."
-                  : "Connect your X account in Settings to get started."}
+                  ? "Set up IFTTT in Settings to save liked posts, or use the bookmarklet."
+                  : "Set up IFTTT in Settings to save posts you like on X."}
               </p>
             </>
           )}

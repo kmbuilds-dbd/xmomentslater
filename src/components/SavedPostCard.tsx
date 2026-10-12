@@ -17,6 +17,7 @@ interface SavedPostCardProps {
   title: string | null;
   preview: string;
   source?: string;
+  category?: string | null;
 }
 
 export function SavedPostCard({
@@ -31,6 +32,7 @@ export function SavedPostCard({
   title,
   preview,
   source,
+  category,
 }: SavedPostCardProps) {
   const [isRead, setIsRead] = useState(!!readAt);
   const [deleted, setDeleted] = useState(false);
@@ -80,6 +82,9 @@ export function SavedPostCard({
             <span className="text-xs text-muted-foreground">@{authorHandle}</span>
           )}
           <span className="flex items-center gap-1.5 ml-auto shrink-0">
+            {source === "ifttt" && (
+              <span className="text-[10px] text-muted-foreground">IFTTT</span>
+            )}
             {source === "bookmark" && (
               <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Bookmark className="h-2.5 w-2.5" />
@@ -104,6 +109,8 @@ export function SavedPostCard({
           {preview}
         </p>
       </Link>
+
+      {category && <p className="text-xs text-muted-foreground mb-2 capitalize">{category}</p>}
 
       {/* Tags */}
       {tags.length > 0 && (

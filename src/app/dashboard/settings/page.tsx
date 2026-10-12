@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { XConnectionCard } from "@/components/XConnectionCard";
+import { IFTTTCard } from "@/components/IFTTTCard";
 import { FeedUrlCard } from "@/components/FeedUrlCard";
 import { BookmarkletButton } from "@/components/BookmarkletButton";
 import { IOSShortcutCard } from "@/components/IOSShortcutCard";
@@ -59,6 +60,16 @@ export default async function SettingsPage() {
       <p className="text-muted-foreground mb-8">
         {user?.email ? `Signed in as ${user.email}` : "Welcome"}
       </p>
+
+      {feedToken && (
+        <section className="mb-8">
+          <h2 className="text-sm font-medium mb-3">Save likes with IFTTT</h2>
+          <IFTTTCard
+            ingestUrl={`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/api/ifttt/ingest`}
+            token={feedToken}
+          />
+        </section>
+      )}
 
       {/* X Connection */}
       <section className="mb-8">

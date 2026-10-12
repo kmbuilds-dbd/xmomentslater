@@ -25,7 +25,7 @@ export default async function ReaderPage({ params }: PageProps) {
   const { data: post } = await supabase
     .from("saved_posts")
     .select(
-      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response"
+      "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, source, category"
     )
     .eq("id", postId)
     .single();
@@ -57,6 +57,8 @@ export default async function ReaderPage({ params }: PageProps) {
   return (
     <ReaderContent
       postId={post.id}
+      source={post.source}
+      category={post.category}
       authorName={post.author_name}
       authorHandle={post.author_handle}
       postedAt={post.posted_at}
