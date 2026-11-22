@@ -1,6 +1,6 @@
 import type { XApiTweetResponse } from "./fetch-tweet";
 
-export type BlockType = "text" | "image" | "heading";
+export type BlockType = "text" | "image" | "heading" | "quote";
 
 export interface ParsedContent {
   author: string;
@@ -35,6 +35,44 @@ function isLikelyHeading(line: string): boolean {
   const lastChar = line.trim().slice(-1);
   // Sentence-ending punctuation → paragraph, not heading
   return ![".","!",";"].includes(lastChar);
+}
+
+/**
+ * Best-effort: recover ordered blocks (with inline image positions) from an
+ * X Article's structured body. The read-side shape is undocumented, so this
+ * probes the known candidate fields and returns null when none is recognized.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseArticleStructured(article: any): ParsedContent["blocks"] | null {
+  const list =
+    article?.contents ??
+    article?.blocks ??
+    article?.body?.blocks ??
+    article?.content_state?.blocks;
+  if (!Array.isArray(list)) return null;
+
+  const out: ParsedContent["blocks"] = [];
+  for (const b of list) {
+    if (!b || typeof b !== "object") continue;
+    const kind = String(b.type ?? b.kind ?? "").toLowerCase();
+    if (kind === "image" || kind === "gif") {
+      const url = b.url ?? b.previewUrl ?? b.preview_url ?? b.src;
+      if (typeof url === "string" && url) out.push({ type: "image", content: url });
+    } else if (kind === "header-one" || kind === "header-two" || kind === "header-three") {
+      const text = String(b.text ?? "").trim();
+      if (text) out.push({ type: "heading", content: text });
+    } else if (kind === "atomic") {
+      const url = b.url ?? b.data?.url ?? b.data?.media_items?.[0]?.url;
+      if (typeof url === "string" && url) out.push({ type: "image", content: url });
+    } else {
+      const text = String(b.text ?? "").trim();
+      if (!text) continue;
+      if (kind === "unordered-list-item") out.push({ type: "text", content: `• ${text}` });
+      else if (kind === "blockquote") out.push({ type: "quote", content: text });
+      else out.push({ type: "text", content: text });
+    }
+  }
+  return out.length ? out : null;
 }
 
 /**
@@ -75,7 +113,7 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
   let blocks: ParsedContent["blocks"] = [];
 
   if (article?.plain_text?.trim()) {
-    blocks = parseArticleBlocks(article.plain_text, article.title);
+    blocks = parseArticleStructured(article) ?? parseArticleBlocks(article.plain_text, article.title);
 
     if (article.cover_media) {
       const coverMedia = allMedia.find(
@@ -145,6 +183,27 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
       if (block) {
         blocks.push(block);
         renderedMediaKeys.add(media.media_key);
+      }
+    }
+  }
+
+  // Quoted tweet: render its text and media inline after the main content.
+  const quotedRef = raw.data.referenced_tweets?.find((r) => r.type === "quoted");
+  if (quotedRef) {
+    const quoted = raw.includes?.tweets?.find((t) => t.id === quotedRef.id);
+    if (quoted) {
+      const quotedText = quoted.note_tweet?.text ?? quoted.text ?? "";
+      if (quotedText.trim()) {
+        blocks.push({ type: "quote", content: quotedText.trim() });
+      }
+      for (const key of quoted.attachments?.media_keys ?? []) {
+        if (renderedMediaKeys.has(key)) continue;
+        const media = allMedia.find((m) => m.media_key === key);
+        const block = media ? mediaToImageBlock(media) : null;
+        if (block) {
+          blocks.push(block);
+          renderedMediaKeys.add(key);
+        }
       }
     }
   }

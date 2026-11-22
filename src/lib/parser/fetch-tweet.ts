@@ -24,10 +24,12 @@ export interface XApiTweetResponse {
       [key: string]: any;
     };
     attachments?: { media_keys?: string[] };
+    referenced_tweets?: Array<{ type: string; id: string }>;
   };
   includes?: {
     users?: Array<{ id: string; name: string; username: string; profile_image_url?: string }>;
     media?: Array<{ media_key: string; type: string; url?: string; preview_image_url?: string; width?: number; height?: number }>;
+    tweets?: Array<XApiTweetResponse["data"]>;
   };
 }
 
@@ -43,12 +45,12 @@ export class XApiError extends Error {
 const X_TWEETS_URL = "https://api.x.com/2/tweets";
 
 const TWEET_FIELDS =
-  "text,created_at,author_id,entities,note_tweet,attachments,article";
+  "text,created_at,author_id,entities,note_tweet,attachments,article,referenced_tweets";
 
 function buildParams(): URLSearchParams {
   return new URLSearchParams({
     "tweet.fields": TWEET_FIELDS,
-    expansions: "author_id,attachments.media_keys",
+    expansions: "author_id,attachments.media_keys,referenced_tweets.id",
     "user.fields": "name,username,profile_image_url",
     "media.fields": "url,preview_image_url,type,width,height",
   });
