@@ -192,11 +192,11 @@ export function ReaderContent({
       <div className="mx-auto max-w-[65ch] px-6 py-12">
         {/* Back button */}
         <Link
-          href="/dashboard"
+          href="/dashboard/reader"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          Library
+          Explore
         </Link>
 
         {/* Author byline */}
@@ -329,11 +329,11 @@ export function ReaderContent({
         {/* Footer */}
         <footer className="mt-12 pt-6 border-t">
           <Link
-            href="/dashboard"
+            href="/dashboard/reader"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to library
+            Back to Explore
           </Link>
         </footer>
       </div>
