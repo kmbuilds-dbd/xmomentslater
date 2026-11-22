@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Plus_Jakarta_Sans, Newsreader } from "next/font/google";
+import { Fraunces, Plus_Jakarta_Sans, Newsreader, Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -22,6 +22,12 @@ const newsreader = Newsreader({
   display: "swap",
 });
 
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "xMomentsLater",
   description: "Distraction-free read-later for X posts",
@@ -35,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fraunces.variable} ${plusJakarta.variable} ${newsreader.variable} antialiased`}
+        className={`${fraunces.variable} ${plusJakarta.variable} ${newsreader.variable} ${inter.variable} antialiased`}
       >
         <ThemeProvider
           attribute="class"
