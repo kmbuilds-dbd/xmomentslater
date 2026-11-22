@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 20;
 const COLS =
-  "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category";
+  "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category, kind";
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -63,8 +63,8 @@ export default async function ReaderPage({ searchParams }: Props) {
 
   if (tag) feedQuery = feedQuery.contains("tags", [tag]);
   if (read) feedQuery = feedQuery.not("read_at", "is", null);
-  if (type === "manual" || type === "bookmark" || type === "ifttt") {
-    feedQuery = feedQuery.eq("source", type);
+  if (["article", "video", "image", "text"].includes(type)) {
+    feedQuery = feedQuery.eq("kind", type);
   }
   if (DATE_RANGES[date]) {
     // eslint-disable-next-line react-hooks/purity -- server-side cutoff for the date filter

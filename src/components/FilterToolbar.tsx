@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Check, ChevronDown, ArrowLeft } from "lucide-react";
 
 const TYPE_OPTIONS = [
-  { value: "manual", label: "Saved" },
-  { value: "bookmark", label: "Bookmarked" },
-  { value: "ifttt", label: "Liked" },
+  { value: "article", label: "Article" },
+  { value: "video", label: "Video" },
+  { value: "image", label: "Image" },
+  { value: "text", label: "Text" },
 ];
 
 const DATE_OPTIONS = [

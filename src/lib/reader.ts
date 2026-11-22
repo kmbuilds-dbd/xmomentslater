@@ -118,7 +118,7 @@ export function getReaderBlocks(post: SavedPostRow): ReaderBlock[] {
 export function mapSavedPostToReaderPost(post: SavedPostRow): ReaderPost {
   return {
     ...mapSavedPostToLibraryPost(post),
-    kind: detectKind(post.raw_api_response),
+    kind: (post.kind as PostKind) ?? detectKind(post.raw_api_response),
     mediaUrls: extractMediaUrls(post.raw_api_response),
     readMinutes: readMinutes(post.parsed_content),
     blocks: getReaderBlocks(post),

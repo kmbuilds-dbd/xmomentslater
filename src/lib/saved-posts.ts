@@ -17,6 +17,7 @@ export interface SavedPostRow {
   title: string | null;
   source: string | null;
   category: string | null;
+  kind: string | null;
 }
 
 export interface LibraryPost {

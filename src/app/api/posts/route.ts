@@ -158,6 +158,7 @@ export async function PUT(request: NextRequest) {
       .update({
         raw_api_response: rawResponse,
         parsed_content: parsed,
+        kind: parsed.kind,
         author_name: parsed.author,
         author_handle: parsed.handle,
         posted_at: parsed.date,

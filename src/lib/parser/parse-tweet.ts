@@ -8,6 +8,7 @@ export interface ParsedContent {
   profileImageUrl?: string;
   date: string;
   blocks: Array<{ type: BlockType; content: string }>;
+  kind: "article" | "video" | "image" | "text";
 }
 
 type Media = NonNullable<NonNullable<XApiTweetResponse["includes"]>["media"]>[number];
@@ -214,5 +215,12 @@ export function parseTweet(raw: XApiTweetResponse): ParsedContent {
     profileImageUrl: author?.profile_image_url,
     date: raw.data.created_at,
     blocks,
+    kind: article
+      ? "article"
+      : allMedia.some((m) => m.type === "video" || m.type === "animated_gif")
+        ? "video"
+        : allMedia.some((m) => m.type === "photo")
+          ? "image"
+          : "text",
   };
 }

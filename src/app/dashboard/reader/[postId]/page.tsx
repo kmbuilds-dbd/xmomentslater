@@ -11,7 +11,7 @@ import type { SavedPostRow } from "@/lib/saved-posts";
 export const dynamic = "force-dynamic";
 
 const COLS =
-  "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category";
+  "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category, kind";
 
 interface PageProps {
   params: Promise<{ postId: string }>;

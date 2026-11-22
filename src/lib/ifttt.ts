@@ -75,6 +75,6 @@ export function parseIftttPayload(input: unknown) {
     throw new IftttPayloadError("Invalid created_at");
   const createdAt = date.toISOString();
   const canonicalUrl = `https://x.com/${handle || "i/web"}/status/${match[2]}`;
-  const parsed: ParsedContent = { author, handle, date: createdAt, blocks: text.split(/\n\s*\n/).map(content => ({ type: "text" as const, content: content.trim() })).filter(block => block.content) };
+  const parsed: ParsedContent = { author, handle, date: createdAt, kind: "text", blocks: text.split(/\n\s*\n/).map(content => ({ type: "text" as const, content: content.trim() })).filter(block => block.content) };
   return { text, author, handle, postId: match[2], url: canonicalUrl, createdAt, parsed };
 }

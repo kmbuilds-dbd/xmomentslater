@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       author_name: post.author, author_handle: post.handle, posted_at: post.createdAt,
       parsed_content: post.parsed, text_content: post.text, source: "ifttt", title: null,
       raw_api_response: { source: "ifttt", text: post.text, author: post.author, url: post.url, created_at: post.createdAt },
-      summary: null, tags: [], category: null,
+      summary: null, tags: [], category: null, kind: "text",
     }).select("id, saved_at").single();
     if (error?.code === "23505")
       return NextResponse.json({ success: true, duplicate: true });

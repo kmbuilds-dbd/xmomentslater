@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
         tags: finalTags,
         raw_api_response: rawResponse,
         parsed_content: parsed,
+        kind: parsed.kind,
         title,
         summary,
         source: "manual",

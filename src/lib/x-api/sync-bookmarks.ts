@@ -122,6 +122,7 @@ async function processBookmarkPage(
         tags,
         raw_api_response: singleResponse,
         parsed_content: parsed,
+        kind: parsed.kind,
         title,
         summary,
         source: "bookmark",
