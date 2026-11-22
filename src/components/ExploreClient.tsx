@@ -6,6 +6,7 @@ import { Search, X } from "lucide-react";
 import { SmartSections } from "@/components/SmartSections";
 import { ExplorePostCard } from "@/components/ExplorePostCard";
 import { ReaderDrawer } from "@/components/ReaderDrawer";
+import { FilterToolbar } from "@/components/FilterToolbar";
 import type { ReaderPost, SmartSection } from "@/lib/reader";
 
 interface ExploreClientProps {
@@ -18,6 +19,15 @@ interface ExploreClientProps {
   q: string;
   tag: string;
   read: boolean;
+  type: string;
+  date: string;
+  year: string;
+  author: string;
+  sort: string;
+  order: string;
+  authors: string[];
+  labels: string[];
+  years: string[];
 }
 
 export function ExploreClient({
@@ -30,46 +40,63 @@ export function ExploreClient({
   q,
   tag,
   read,
+  type,
+  date,
+  year,
+  author,
+  sort,
+  order,
+  authors,
+  labels,
+  years,
 }: ExploreClientProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<ReaderPost | null>(null);
   const [query, setQuery] = useState(q);
 
-  const readerUrl = (overrides: { q?: string; page?: number; tag?: string; read?: boolean }) => {
+  const navigate = (patch: Record<string, string | boolean | number>) => {
+    const state = {
+      q,
+      tag,
+      read,
+      type,
+      date,
+      year,
+      author,
+      sort,
+      order,
+      page,
+      ...patch,
+    } as Record<string, string | boolean | number>;
+
     const p = new URLSearchParams();
-    const nextQ = overrides.q !== undefined ? overrides.q : q;
-    const nextTag = overrides.tag !== undefined ? overrides.tag : tag;
-    const nextRead = overrides.read !== undefined ? overrides.read : read;
-    if (nextQ) p.set("q", nextQ);
-    if (nextTag) p.set("tag", nextTag);
-    if (nextRead) p.set("read", "1");
-    const nextPage = overrides.page !== undefined ? overrides.page : page;
-    if (nextPage && nextPage > 1) p.set("page", String(nextPage));
+    if (state.q) p.set("q", String(state.q));
+    if (state.tag) p.set("tag", String(state.tag));
+    if (state.read) p.set("read", "1");
+    if (state.type) p.set("type", String(state.type));
+    if (state.date) p.set("date", String(state.date));
+    if (state.year) p.set("year", String(state.year));
+    if (state.author) p.set("author", String(state.author));
+    if (state.sort && state.sort !== "imported") p.set("sort", String(state.sort));
+    if (state.order && state.order !== "desc") p.set("order", String(state.order));
+    const pageNum = Number(state.page) || 1;
+    if (pageNum > 1) p.set("page", String(pageNum));
+
     const s = p.toString();
-    return s ? `/dashboard/reader?${s}` : "/dashboard/reader";
+    router.push(s ? `/dashboard/reader?${s}` : "/dashboard/reader");
   };
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(readerUrl({ q: query.trim(), page: 1 }));
+    navigate({ q: query.trim(), page: 1 });
   };
 
   const clearSearch = () => {
     setQuery("");
-    router.push(readerUrl({ q: "", page: 1 }));
+    navigate({ q: "", page: 1 });
   };
 
-  const clearTag = () => {
-    router.push(readerUrl({ tag: "", page: 1 }));
-  };
-
-  const filterLabel = q
-    ? `${feedCount} result${feedCount === 1 ? "" : "s"} for “${q}”`
-    : tag
-      ? `${feedCount} post${feedCount === 1 ? "" : "s"} tagged “${tag}”`
-      : read
-        ? `${feedCount} read post${feedCount === 1 ? "" : "s"}`
-        : null;
+  const hasFilter = !!(q || tag || read || type || date || year || author);
 
   return (
     <>
@@ -95,6 +122,23 @@ export function ExploreClient({
         </form>
       </div>
 
+      {/* Filter / sort toolbar */}
+      <div className="mt-4">
+        <FilterToolbar
+          type={type}
+          date={date}
+          year={year}
+          author={author}
+          tag={tag}
+          sort={sort}
+          order={order}
+          authors={authors}
+          labels={labels}
+          years={years}
+          onChange={(patch) => navigate({ ...patch, page: 1 })}
+        />
+      </div>
+
       {/* Right now */}
       <section className="mt-6">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -107,18 +151,16 @@ export function ExploreClient({
 
       {/* Feed */}
       <section className="mt-8 space-y-3">
-        {filterLabel && (
+        {hasFilter && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {filterLabel}
-            {tag && (
-              <button
-                onClick={clearTag}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs hover:text-foreground"
-              >
-                Clear tag
-                <X className="h-3 w-3" />
-              </button>
-            )}
+            {feedCount} result{feedCount === 1 ? "" : "s"}
+            <button
+              onClick={() => navigate({ q: "", tag: "", read: false, type: "", date: "", year: "", author: "", page: 1 })}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs hover:text-foreground"
+            >
+              Clear filters
+              <X className="h-3 w-3" />
+            </button>
           </p>
         )}
         {feed.length > 0 ? (
@@ -127,7 +169,7 @@ export function ExploreClient({
           <div className="rounded-xl border border-dashed px-8 py-16 text-center">
             <p className="text-lg text-muted-foreground">Nothing here yet</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Save posts from X and they&apos;ll show up here.
+              No posts match these filters.
             </p>
           </div>
         )}
@@ -135,7 +177,7 @@ export function ExploreClient({
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 pt-4">
             <button
-              onClick={() => router.push(readerUrl({ page: page - 1 }))}
+              onClick={() => navigate({ page: page - 1 })}
               disabled={page <= 1}
               className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30"
             >
@@ -145,7 +187,7 @@ export function ExploreClient({
               Page {page} of {totalPages}
             </span>
             <button
-              onClick={() => router.push(readerUrl({ page: page + 1 }))}
+              onClick={() => navigate({ page: page + 1 })}
               disabled={page >= totalPages}
               className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30"
             >

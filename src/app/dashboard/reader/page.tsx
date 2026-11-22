@@ -18,6 +18,12 @@ interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+const DATE_RANGES: Record<string, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
 export default async function ReaderPage({ searchParams }: Props) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -29,12 +35,18 @@ export default async function ReaderPage({ searchParams }: Props) {
   const q = typeof params.q === "string" ? params.q.trim() : "";
   const tag = typeof params.tag === "string" ? params.tag.trim() : "";
   const read = typeof params.read === "string" ? params.read === "1" : false;
+  const type = typeof params.type === "string" ? params.type : "";
+  const date = typeof params.date === "string" ? params.date : "";
+  const year = typeof params.year === "string" ? params.year : "";
+  const author = typeof params.author === "string" ? params.author : "";
+  const sort = typeof params.sort === "string" ? params.sort : "imported";
+  const order = typeof params.order === "string" ? params.order : "desc";
   const page = Math.max(
     1,
     parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1
   );
 
-  // Feed: non-archived posts, optional keyword/tag/read filters, newest posted first.
+  // Feed: non-archived posts with optional filters.
   let feedQuery = supabase
     .from("saved_posts")
     .select(COLS, { count: "exact" })
@@ -49,18 +61,30 @@ export default async function ReaderPage({ searchParams }: Props) {
     }
   }
 
-  if (tag) {
-    feedQuery = feedQuery.contains("tags", [tag]);
+  if (tag) feedQuery = feedQuery.contains("tags", [tag]);
+  if (read) feedQuery = feedQuery.not("read_at", "is", null);
+  if (type === "manual" || type === "bookmark" || type === "ifttt") {
+    feedQuery = feedQuery.eq("source", type);
   }
+  if (DATE_RANGES[date]) {
+    // eslint-disable-next-line react-hooks/purity -- server-side cutoff for the date filter
+    const since = new Date(Date.now() - DATE_RANGES[date] * 86400000).toISOString();
+    feedQuery = feedQuery.gte("saved_at", since);
+  }
+  if (/^\d{4}$/.test(year)) {
+    feedQuery = feedQuery
+      .gte("posted_at", `${year}-01-01T00:00:00.000Z`)
+      .lt("posted_at", `${Number(year) + 1}-01-01T00:00:00.000Z`);
+  }
+  if (author) feedQuery = feedQuery.eq("author_handle", author);
 
-  if (read) {
-    feedQuery = feedQuery.not("read_at", "is", null);
-  }
+  const sortField = sort === "posted" ? "posted_at" : "saved_at";
+  const ascending = order === "asc";
 
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
   const { data: feedRows, count: feedCount } = await feedQuery
-    .order("posted_at", { ascending: false, nullsFirst: false })
+    .order(sortField, { ascending, nullsFirst: false })
     .range(from, to);
 
   const { count: totalCount } = await supabase
@@ -119,6 +143,38 @@ export default async function ReaderPage({ searchParams }: Props) {
     },
   ];
 
+  // Distinct values for the filter dropdowns.
+  const [{ data: authorRows }, { data: labelRows }, { data: postedRows }] =
+    await Promise.all([
+      supabase.from("saved_posts").select("author_handle").is("archived_at", null),
+      supabase.from("saved_posts").select("tags").is("archived_at", null),
+      supabase
+        .from("saved_posts")
+        .select("posted_at")
+        .is("archived_at", null)
+        .not("posted_at", "is", null),
+    ]);
+
+  const authors = [
+    ...new Set(
+      (authorRows ?? []).map((r) => r.author_handle).filter((h): h is string => !!h)
+    ),
+  ].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  const labels = [
+    ...new Set((labelRows ?? []).flatMap((r) => r.tags ?? [])),
+  ].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+  const years = [
+    ...new Set(
+      (postedRows ?? [])
+        .map((r) => (r.posted_at ? new Date(r.posted_at).getUTCFullYear() : null))
+        .filter((y): y is number => !!y)
+    ),
+  ]
+    .sort((a, b) => b - a)
+    .map(String);
+
   const totalPages = Math.max(1, Math.ceil((feedCount ?? 0) / PAGE_SIZE));
 
   return (
@@ -133,6 +189,15 @@ export default async function ReaderPage({ searchParams }: Props) {
         q={q}
         tag={tag}
         read={read}
+        type={type}
+        date={date}
+        year={year}
+        author={author}
+        sort={sort}
+        order={order}
+        authors={authors}
+        labels={labels}
+        years={years}
       />
     </main>
   );
