@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { ReaderBody } from "@/components/ReaderBody";
+import { RefreshButton } from "@/components/RefreshButton";
 import { mapSavedPostToReaderPost } from "@/lib/reader";
 import type { SavedPostRow } from "@/lib/saved-posts";
 
@@ -58,13 +59,16 @@ export default async function ReaderPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-2xl px-7 py-8">
-      <Link
-        href="/dashboard/reader"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Explore
-      </Link>
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href="/dashboard/reader"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Explore
+        </Link>
+        <RefreshButton postId={postId} />
+      </div>
       <ReaderBody post={readerPost} />
     </main>
   );
