@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { Zap, Play, Wrench, Sparkles } from "lucide-react";
-import type { SmartSection } from "@/lib/reader";
+import type { ReaderPost, SmartSection } from "@/lib/reader";
 
 const ICONS = {
   "quick-pass": Zap,
@@ -8,7 +7,13 @@ const ICONS = {
   "to-try": Wrench,
 } as const;
 
-export function SmartSections({ sections }: { sections: SmartSection[] }) {
+export function SmartSections({
+  sections,
+  onOpen,
+}: {
+  sections: SmartSection[];
+  onOpen: (post: ReaderPost) => void;
+}) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {sections.map((section) => {
@@ -39,13 +44,13 @@ export function SmartSections({ sections }: { sections: SmartSection[] }) {
 
             <div className="mt-3 flex items-center gap-2 pt-1">
               {first ? (
-                <Link
-                  href={`/dashboard/reader/${first.id}`}
+                <button
+                  onClick={() => onOpen(first)}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-secondary transition-colors"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {section.actionLabel}
-                </Link>
+                </button>
               ) : null}
               <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
                 <Sparkles className="h-3 w-3" />

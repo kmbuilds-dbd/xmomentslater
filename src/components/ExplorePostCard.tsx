@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Archive, ArchiveRestore, Trash2, ExternalLink, Play, FileText } from "lucide-react";
 import { formatTimeAgo } from "@/lib/utils";
 import type { ReaderPost } from "@/lib/reader";
@@ -10,9 +9,11 @@ interface ExplorePostCardProps {
   post: ReaderPost;
   /** When true (Archive view), the primary action is "unarchive" instead of archive. */
   archived?: boolean;
+  /** Opens the post in the reading drawer. */
+  onOpen: (post: ReaderPost) => void;
 }
 
-export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps) {
+export function ExplorePostCard({ post, archived = false, onOpen }: ExplorePostCardProps) {
   const [hidden, setHidden] = useState(false);
   const [acting, setActing] = useState(false);
 
@@ -22,7 +23,8 @@ export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps
   const timeLabel = post.postedAt ? formatTimeAgo(post.postedAt) : formatTimeAgo(post.savedAt);
   const isRead = !!post.readAt;
 
-  const handleArchive = async () => {
+  const handleArchive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setActing(true);
     const res = await fetch("/api/posts", {
       method: "PATCH",
@@ -33,7 +35,8 @@ export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps
     setActing(false);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setActing(true);
     const res = await fetch("/api/posts", {
       method: "DELETE",
@@ -48,7 +51,10 @@ export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps
     post.kind === "article" ? "Article" : post.kind === "video" ? "Video" : post.kind === "image" ? "Image" : null;
 
   return (
-    <div className={`rounded-xl border border-border bg-card p-4 ${isRead ? "opacity-70" : ""}`}>
+    <div
+      onClick={() => onOpen(post)}
+      className={`cursor-pointer rounded-xl border border-border bg-card p-4 transition-colors hover:bg-secondary/20 ${isRead ? "opacity-70" : ""}`}
+    >
       {/* Author */}
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary text-sm font-semibold">
@@ -61,7 +67,7 @@ export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps
             {timeLabel}
           </p>
         </div>
-        <span className="ml-auto flex items-center gap-0.5">
+        <span className="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={handleArchive}
             disabled={acting}
@@ -110,20 +116,20 @@ export function ExplorePostCard({ post, archived = false }: ExplorePostCardProps
       </div>
 
       {/* Footer */}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
         {kindLabel && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground">
             {kindLabel}
           </span>
         )}
         <span className="text-[10px] text-muted-foreground">{post.readMinutes} min</span>
-        <Link
-          href={`/dashboard/reader/${post.id}`}
+        <button
+          onClick={() => onOpen(post)}
           className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-secondary transition-colors"
         >
           {post.kind === "video" ? <Play className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
           {post.kind === "video" ? "Watch" : "Read"}
-        </Link>
+        </button>
       </div>
     </div>
   );

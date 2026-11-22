@@ -3,6 +3,11 @@ import { mapSavedPostToLibraryPost, type SavedPostRow } from "@/lib/saved-posts"
 /** Drives the card body: article embed vs video/image media vs plain text. */
 export type PostKind = "article" | "video" | "image" | "text";
 
+export interface ReaderBlock {
+  type: "text" | "image" | "heading" | "quote";
+  content: string;
+}
+
 export interface ReaderPost {
   id: string;
   authorName: string | null;
@@ -19,6 +24,8 @@ export interface ReaderPost {
   kind: PostKind;
   mediaUrls: string[];
   readMinutes: number;
+  /** Content blocks in reading order (inline images preserved). */
+  blocks: ReaderBlock[];
 }
 
 export interface SmartSection {
@@ -66,12 +73,55 @@ function readMinutes(parsed: SavedPostRow["parsed_content"]): number {
   return Math.max(1, Math.ceil(words / 200));
 }
 
+function isLikelyHeading(line: string): boolean {
+  if (line.length > 80 || line.length < 2) return false;
+  return ![".", "!", ";"].includes(line.trim().slice(-1));
+}
+
+/** Recover ordered blocks from the raw X API response when parsed_content is empty. */
+function extractBlocksFromRaw(raw: unknown): ReaderBlock[] {
+  if (!raw || typeof raw !== "object" || !("data" in raw)) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (raw as any).data;
+  const out: ReaderBlock[] = [];
+
+  if (data?.article?.plain_text?.trim()) {
+    if (data.article.title?.trim()) {
+      out.push({ type: "heading", content: data.article.title.trim() });
+    }
+    for (const line of data.article.plain_text.split("\n")) {
+      const t = line.trim();
+      if (!t) continue;
+      out.push({ type: isLikelyHeading(t) ? "heading" : "text", content: t });
+    }
+  } else {
+    const text = data?.note_tweet?.text ?? data?.text;
+    if (text?.trim()) out.push({ type: "text", content: text.trim() });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const m of (raw as any).includes?.media ?? []) {
+    if (m.type === "photo" && m.url) out.push({ type: "image", content: m.url });
+    else if ((m.type === "video" || m.type === "animated_gif") && m.preview_image_url) {
+      out.push({ type: "image", content: m.preview_image_url });
+    }
+  }
+  return out;
+}
+
+export function getReaderBlocks(post: SavedPostRow): ReaderBlock[] {
+  const blocks = post.parsed_content?.blocks;
+  if (blocks && blocks.length > 0) return blocks as ReaderBlock[];
+  return extractBlocksFromRaw(post.raw_api_response);
+}
+
 export function mapSavedPostToReaderPost(post: SavedPostRow): ReaderPost {
   return {
     ...mapSavedPostToLibraryPost(post),
     kind: detectKind(post.raw_api_response),
     mediaUrls: extractMediaUrls(post.raw_api_response),
     readMinutes: readMinutes(post.parsed_content),
+    blocks: getReaderBlocks(post),
   };
 }
 

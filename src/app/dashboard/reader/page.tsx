@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { SmartSections } from "@/components/SmartSections";
-import { ExplorePostCard } from "@/components/ExplorePostCard";
+import { ExploreClient } from "@/components/ExploreClient";
 import {
   mapSavedPostToReaderPost,
   isActionable,
@@ -116,79 +113,15 @@ export default async function ReaderPage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Explore</h1>
-        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground">
-          {totalCount ?? 0}
-        </span>
-        <form action="/dashboard/reader" className="ml-auto flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search…"
-            className="w-40 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </form>
-      </div>
-
-      {/* Right Now */}
-      <section className="mt-6">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Right now
-        </p>
-        <div className="mt-2">
-          <SmartSections sections={sections} />
-        </div>
-      </section>
-
-      {/* Feed */}
-      <section className="mt-8 space-y-3">
-        {q && (
-          <p className="text-sm text-muted-foreground">
-            {feedCount ?? 0} result{(feedCount ?? 0) === 1 ? "" : "s"} for “{q}”
-          </p>
-        )}
-        {feed.length > 0 ? (
-          feed.map((p) => <ExplorePostCard key={p.id} post={p} />)
-        ) : (
-          <div className="rounded-xl border border-dashed px-8 py-16 text-center">
-            <p className="text-lg text-muted-foreground">Nothing here yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Save posts from X and they&apos;ll show up here.
-            </p>
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-4 pt-4">
-            {page > 1 ? (
-              <Link
-                href={`/dashboard/reader?page=${page - 1}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Prev
-              </Link>
-            ) : (
-              <span className="text-sm text-muted-foreground opacity-30">Prev</span>
-            )}
-            <span className="text-sm text-muted-foreground">
-              Page {page} of {totalPages}
-            </span>
-            {page < totalPages ? (
-              <Link
-                href={`/dashboard/reader?page=${page + 1}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Next
-              </Link>
-            ) : (
-              <span className="text-sm text-muted-foreground opacity-30">Next</span>
-            )}
-          </div>
-        )}
-      </section>
+      <ExploreClient
+        feed={feed}
+        sections={sections}
+        totalCount={totalCount ?? 0}
+        feedCount={feedCount ?? 0}
+        totalPages={totalPages}
+        page={page}
+        q={q}
+      />
     </main>
   );
 }
