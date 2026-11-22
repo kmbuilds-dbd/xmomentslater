@@ -38,7 +38,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     .select(
       "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category",
       { count: "exact" }
-    );
+    )
+    .is("archived_at", null);
 
   // Source filter (manual vs bookmark)
   if (source === "manual" || source === "bookmark" || source === "ifttt") {

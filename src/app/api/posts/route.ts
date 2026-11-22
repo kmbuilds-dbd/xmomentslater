@@ -9,7 +9,7 @@ import {
 } from "@/lib/vector-search";
 import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
 
-// PATCH — mark read / unread
+// PATCH — mark read / unread, archive / unarchive
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -23,9 +23,18 @@ export async function PATCH(request: NextRequest) {
 
     const { id, action } = await request.json();
 
-    if (!id || !["read", "unread"].includes(action)) {
+    if (!id || !["read", "unread", "archive", "unarchive"].includes(action)) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
+
+    const update: Record<string, string | null> =
+      action === "read"
+        ? { read_at: new Date().toISOString() }
+        : action === "unread"
+          ? { read_at: null }
+          : action === "archive"
+            ? { archived_at: new Date().toISOString() }
+            : { archived_at: null };
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!serviceRoleKey) {
@@ -39,7 +48,7 @@ export async function PATCH(request: NextRequest) {
 
     const { error: dbError } = await admin
       .from("saved_posts")
-      .update({ read_at: action === "read" ? new Date().toISOString() : null })
+      .update(update)
       .eq("id", id)
       .eq("user_id", user.id);
 
