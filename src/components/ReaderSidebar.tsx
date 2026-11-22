@@ -129,7 +129,7 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
               <Archive className="h-4 w-4" />
               Archive
             </Link>
-            <Link href="/dashboard?showRead=true" className={navLink(false)}>
+            <Link href="/dashboard/reader?read=1" className={navLink(false)}>
               <Clock className="h-4 w-4" />
               History
             </Link>
@@ -145,7 +145,7 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
               {topLabels.map(({ tag, count }) => (
                 <Link
                   key={tag}
-                  href={`/dashboard?tag=${encodeURIComponent(tag)}`}
+                  href={`/dashboard/reader?tag=${encodeURIComponent(tag)}`}
                   className={navLink(false)}
                 >
                   <Tag className="h-4 w-4" />

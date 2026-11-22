@@ -27,12 +27,14 @@ export default async function ReaderPage({ searchParams }: Props) {
   if (!user) redirect("/login");
 
   const q = typeof params.q === "string" ? params.q.trim() : "";
+  const tag = typeof params.tag === "string" ? params.tag.trim() : "";
+  const read = typeof params.read === "string" ? params.read === "1" : false;
   const page = Math.max(
     1,
     parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1
   );
 
-  // Feed: non-archived posts, optional keyword search, newest posted first.
+  // Feed: non-archived posts, optional keyword/tag/read filters, newest posted first.
   let feedQuery = supabase
     .from("saved_posts")
     .select(COLS, { count: "exact" })
@@ -45,6 +47,14 @@ export default async function ReaderPage({ searchParams }: Props) {
         `author_name.ilike.%${safeQ}%,author_handle.ilike.%${safeQ}%,summary.ilike.%${safeQ}%,title.ilike.%${safeQ}%,text_content.ilike.%${safeQ}%`
       );
     }
+  }
+
+  if (tag) {
+    feedQuery = feedQuery.contains("tags", [tag]);
+  }
+
+  if (read) {
+    feedQuery = feedQuery.not("read_at", "is", null);
   }
 
   const from = (page - 1) * PAGE_SIZE;
@@ -121,6 +131,8 @@ export default async function ReaderPage({ searchParams }: Props) {
         totalPages={totalPages}
         page={page}
         q={q}
+        tag={tag}
+        read={read}
       />
     </main>
   );

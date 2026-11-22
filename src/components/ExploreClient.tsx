@@ -16,6 +16,8 @@ interface ExploreClientProps {
   totalPages: number;
   page: number;
   q: string;
+  tag: string;
+  read: boolean;
 }
 
 export function ExploreClient({
@@ -26,25 +28,48 @@ export function ExploreClient({
   totalPages,
   page,
   q,
+  tag,
+  read,
 }: ExploreClientProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<ReaderPost | null>(null);
   const [query, setQuery] = useState(q);
 
+  const readerUrl = (overrides: { q?: string; page?: number; tag?: string; read?: boolean }) => {
+    const p = new URLSearchParams();
+    const nextQ = overrides.q !== undefined ? overrides.q : q;
+    const nextTag = overrides.tag !== undefined ? overrides.tag : tag;
+    const nextRead = overrides.read !== undefined ? overrides.read : read;
+    if (nextQ) p.set("q", nextQ);
+    if (nextTag) p.set("tag", nextTag);
+    if (nextRead) p.set("read", "1");
+    const nextPage = overrides.page !== undefined ? overrides.page : page;
+    if (nextPage && nextPage > 1) p.set("page", String(nextPage));
+    const s = p.toString();
+    return s ? `/dashboard/reader?${s}` : "/dashboard/reader";
+  };
+
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = query.trim();
-    router.push(trimmed ? `/dashboard/reader?q=${encodeURIComponent(trimmed)}` : "/dashboard/reader");
+    router.push(readerUrl({ q: query.trim(), page: 1 }));
   };
 
   const clearSearch = () => {
     setQuery("");
-    router.push("/dashboard/reader");
+    router.push(readerUrl({ q: "", page: 1 }));
   };
 
-  const goTo = (pageNum: number) => {
-    router.push(`/dashboard/reader?page=${pageNum}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+  const clearTag = () => {
+    router.push(readerUrl({ tag: "", page: 1 }));
   };
+
+  const filterLabel = q
+    ? `${feedCount} result${feedCount === 1 ? "" : "s"} for “${q}”`
+    : tag
+      ? `${feedCount} post${feedCount === 1 ? "" : "s"} tagged “${tag}”`
+      : read
+        ? `${feedCount} read post${feedCount === 1 ? "" : "s"}`
+        : null;
 
   return (
     <>
@@ -82,9 +107,18 @@ export function ExploreClient({
 
       {/* Feed */}
       <section className="mt-8 space-y-3">
-        {q && (
-          <p className="text-sm text-muted-foreground">
-            {feedCount} result{feedCount === 1 ? "" : "s"} for “{q}”
+        {filterLabel && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            {filterLabel}
+            {tag && (
+              <button
+                onClick={clearTag}
+                className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs hover:text-foreground"
+              >
+                Clear tag
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </p>
         )}
         {feed.length > 0 ? (
@@ -101,7 +135,7 @@ export function ExploreClient({
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 pt-4">
             <button
-              onClick={() => goTo(page - 1)}
+              onClick={() => router.push(readerUrl({ page: page - 1 }))}
               disabled={page <= 1}
               className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30"
             >
@@ -111,7 +145,7 @@ export function ExploreClient({
               Page {page} of {totalPages}
             </span>
             <button
-              onClick={() => goTo(page + 1)}
+              onClick={() => router.push(readerUrl({ page: page + 1 }))}
               disabled={page >= totalPages}
               className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-30"
             >
