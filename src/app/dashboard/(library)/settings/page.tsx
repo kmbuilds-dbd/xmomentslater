@@ -7,8 +7,10 @@ import { BookmarkletButton } from "@/components/BookmarkletButton";
 import { IOSShortcutCard } from "@/components/IOSShortcutCard";
 import { BookmarkSyncCard } from "@/components/BookmarkSyncCard";
 import { TagBackfillCard } from "@/components/TagBackfillCard";
+import { AIAssistantCard } from "@/components/AIAssistantCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
 import { isBackfillAdmin } from "@/lib/backfill-auth";
+import { hasGeminiKey } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,8 @@ export default async function SettingsPage() {
     .from("x_connections")
     .select("x_handle, last_bookmark_sync_at")
     .single();
+
+  const hasAiKey = user ? await hasGeminiKey(user.id) : false;
 
   // Fetch or create feed token
   let feedToken: string | null = null;
@@ -70,6 +74,12 @@ export default async function SettingsPage() {
           />
         </section>
       )}
+
+      {/* AI Assistant */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">AI Assistant</h2>
+        <AIAssistantCard initialHasKey={hasAiKey} />
+      </section>
 
       {/* X Connection */}
       <section className="mb-8">

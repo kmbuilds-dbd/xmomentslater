@@ -13,6 +13,7 @@ export interface SavedPostRow {
   x_post_url: string;
   parsed_content: ParsedContent | null;
   raw_api_response: unknown;
+  text_content: string | null;
   summary: string | null;
   title: string | null;
   source: string | null;
