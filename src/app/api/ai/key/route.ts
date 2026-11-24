@@ -51,7 +51,11 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Save AI key error:", error);
-      return NextResponse.json({ error: "Failed to save key" }, { status: 500 });
+      const detail = error.message || "unknown error";
+      return NextResponse.json(
+        { error: `Failed to save key — ${detail}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ hasKey: true });
