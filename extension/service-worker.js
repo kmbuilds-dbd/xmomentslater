@@ -161,7 +161,10 @@ async function fetchBookmarksPage(authToken, ct0, cursor) {
     credentials: "include",
   });
 
-  if (!res.ok) throw new Error(`X returned ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`X returned ${res.status}: ${body.slice(0, 300)}`);
+  }
   return res.json();
 }
 
