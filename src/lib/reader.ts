@@ -37,6 +37,7 @@ export interface SmartSection {
 }
 
 interface RawMedia {
+  media_key?: string;
   type?: string;
   url?: string;
   preview_image_url?: string;
@@ -48,11 +49,24 @@ function rawMediaList(raw: unknown): RawMedia[] {
   return Array.isArray(media) ? media : [];
 }
 
+/** Media belonging to this tweet only, per its attachments.media_keys.
+ * Bulk imports share one `includes.media` across many tweets, so without this
+ * every card would pick the same first image. */
+function ownMedia(raw: unknown): RawMedia[] {
+  const all = rawMediaList(raw);
+  if (!raw || typeof raw !== "object" || !("data" in raw)) return all;
+  const data = (raw as { data?: { attachments?: { media_keys?: string[] } } }).data;
+  const keys = data?.attachments?.media_keys;
+  if (!keys || keys.length === 0) return all;
+  const keySet = new Set(keys);
+  return all.filter((m) => m.media_key && keySet.has(m.media_key));
+}
+
 function detectKind(raw: unknown): PostKind {
   if (raw && typeof raw === "object" && "data" in raw) {
     if ((raw as { data?: { article?: unknown } }).data?.article) return "article";
   }
-  const media = rawMediaList(raw);
+  const media = ownMedia(raw);
   if (media.some((m) => m.type === "video" || m.type === "animated_gif")) {
     return "video";
   }
@@ -61,7 +75,7 @@ function detectKind(raw: unknown): PostKind {
 }
 
 function extractMediaUrls(raw: unknown): string[] {
-  return rawMediaList(raw)
+  return ownMedia(raw)
     .map((m) => (m.type === "photo" ? m.url : m.preview_image_url))
     .filter((u): u is string => !!u);
 }
