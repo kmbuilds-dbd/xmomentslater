@@ -6,6 +6,7 @@ import { Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Status = "idle" | "running" | "done" | "error";
+type Mode = "fill" | "retag";
 
 interface BackfillResponse {
   success?: boolean;
@@ -26,7 +27,7 @@ export function TagBackfillCard() {
   const [progress, setProgress] = useState<{ batch: number; tagged: number } | null>(null);
   const cancelRef = useRef(false);
 
-  const handleRun = async () => {
+  const handleRun = async (mode: Mode) => {
     cancelRef.current = false;
     setStatus("running");
     setMessage(null);
@@ -48,7 +49,7 @@ export function TagBackfillCard() {
         const res = await fetch("/api/tags/backfill", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cursor, limit: 50 }),
+          body: JSON.stringify({ cursor, limit: 50, mode }),
         });
         const data = (await res.json()) as BackfillResponse;
 
@@ -70,7 +71,9 @@ export function TagBackfillCard() {
       } while (cursor);
 
       const breakdown = [
-        totalAlreadyTagged > 0 ? `${totalAlreadyTagged} already tagged` : null,
+        mode === "fill" && totalAlreadyTagged > 0
+          ? `${totalAlreadyTagged} already tagged`
+          : null,
         totalNoText > 0 ? `${totalNoText} had no text` : null,
         totalTooShort > 0 ? `${totalTooShort} too short to tag` : null,
         totalFailed > 0
@@ -100,12 +103,12 @@ export function TagBackfillCard() {
         <div>
           <p className="text-sm font-medium flex items-center gap-1.5">
             <Tags className="h-3.5 w-3.5" />
-            Backfill missing tags
+            Tags
           </p>
           <p className="text-xs text-muted-foreground">
             {status === "running" && progress
               ? `Running... batch ${progress.batch}, ${progress.tagged} tagged so far`
-              : "Admin-only: assigns two topical tags to any post that's untagged."}
+              : "Fill missing tags, or regenerate every tag for a clean start."}
           </p>
         </div>
         {status === "running" ? (
@@ -113,9 +116,14 @@ export function TagBackfillCard() {
             Cancel
           </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={handleRun}>
-            Run backfill
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleRun("fill")}>
+              Fill missing
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleRun("retag")}>
+              Re-tag all
+            </Button>
+          </div>
         )}
       </div>
       {message && (

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isAnthropicConfigured } from "@/lib/anthropic-client";
 import { generateTagsDebug, TAGS_MIN_LENGTH } from "@/lib/generate-tags";
-import { isBackfillAdmin } from "@/lib/backfill-auth";
+
+export const maxDuration = 300;
 
 /** A post counts as "missing tags" if it has none, or only the old generic
  * "bookmark" placeholder tag that sync used to assign (source already
@@ -14,9 +15,10 @@ function needsTags(tags: string[] | null): boolean {
   return normalized.length === 0 || (normalized.length === 1 && normalized[0] === "bookmark");
 }
 
-// POST — walk existing saved_posts and assign two topical tags to any post
-// that's missing real ones. Paginated like /api/search/backfill; call
-// repeatedly with the returned nextCursor until it comes back null.
+// POST — walk existing saved_posts and assign two topical tags. Default
+// `mode` fills only posts that are missing real tags; `mode: "retag"`
+// overwrites every post's tags for a clean start. Paginated; call repeatedly
+// with the returned nextCursor until it comes back null.
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -25,10 +27,6 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!isBackfillAdmin(user.email)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   // Fail fast and say so, instead of quietly "succeeding" with 0 tagged —
@@ -43,6 +41,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const limit = Math.min(Math.max(Number(body.limit ?? 50), 1), 100);
   const cursor = typeof body.cursor === "string" ? body.cursor : undefined;
+  const retagAll = body.mode === "retag";
 
   let query = supabase
     .from("saved_posts")
@@ -68,7 +67,7 @@ export async function POST(request: NextRequest) {
   let sampleError: string | null = null;
 
   for (const post of posts ?? []) {
-    if (!needsTags(post.tags)) {
+    if (!retagAll && !needsTags(post.tags)) {
       alreadyTagged++;
       continue;
     }

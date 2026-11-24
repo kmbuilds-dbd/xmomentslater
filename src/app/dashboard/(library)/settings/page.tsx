@@ -9,7 +9,6 @@ import { BookmarkSyncCard } from "@/components/BookmarkSyncCard";
 import { TagBackfillCard } from "@/components/TagBackfillCard";
 import { AIAssistantCard } from "@/components/AIAssistantCard";
 import { getBookmarkletCode } from "@/lib/bookmarklet";
-import { isBackfillAdmin } from "@/lib/backfill-auth";
 import { hasGeminiKey } from "@/lib/ai";
 
 export const dynamic = "force-dynamic";
@@ -127,13 +126,13 @@ export default async function SettingsPage() {
         </section>
       )}
 
+      {/* Tags */}
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-3">Tags</h2>
+        <TagBackfillCard />
+      </section>
+
       {/* Admin-only maintenance actions */}
-      {isBackfillAdmin(user?.email) && (
-        <section className="mb-8">
-          <h2 className="text-sm font-medium mb-3">Maintenance</h2>
-          <TagBackfillCard />
-        </section>
-      )}
     </main>
   );
 }
