@@ -275,6 +275,12 @@ async function importBookmarks() {
 
     imported += out.imported ?? 0;
     skipped += out.skipped ?? 0;
+
+    // Bookmarks come newest-first, so an all-duplicate page means everything
+    // older is already imported — stop pulling instead of re-downloading the
+    // whole history.
+    if ((out.imported ?? 0) === 0) break;
+
     cursor = next;
     if (!cursor) break;
   }

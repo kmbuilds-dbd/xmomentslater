@@ -13,7 +13,14 @@ button.addEventListener("click", async () => {
   try {
     const result = await chrome.runtime.sendMessage({ type: "xml-import-bookmarks" });
     if (result?.ok) {
-      setStatus(`Imported ${result.imported} · ${result.skipped} already saved`, "ok");
+      if (result.imported === 0) {
+        setStatus("You're caught up — no new bookmarks.", "ok");
+      } else {
+        setStatus(
+          `Imported ${result.imported} new${result.skipped ? ` · ${result.skipped} already saved` : ""}`,
+          "ok"
+        );
+      }
     } else {
       setStatus(result?.error || "Import failed", "error");
     }
