@@ -66,12 +66,15 @@ function normalizeAppUrl(value) {
 
 async function getAppUrl() {
   const { appUrl } = await chrome.storage.sync.get("appUrl");
-  return normalizeAppUrl(appUrl) ?? DEFAULT_APP_URL;
+  const stored = normalizeAppUrl(appUrl);
+  // Migrate the old broken default (localhost) to the deployed app.
+  if (!stored || stored === "http://localhost:3001") return DEFAULT_APP_URL;
+  return stored;
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
   const { appUrl } = await chrome.storage.sync.get("appUrl");
-  if (!normalizeAppUrl(appUrl)) {
+  if (!normalizeAppUrl(appUrl) || appUrl === "http://localhost:3001") {
     await chrome.storage.sync.set({ appUrl: DEFAULT_APP_URL });
   }
 });
