@@ -1,4 +1,4 @@
-const DEFAULT_APP_URL = "http://localhost:3001";
+const DEFAULT_APP_URL = "https://xmomentslater-production.up.railway.app";
 
 // Live values captured from X's web client on the bookmarks page.
 const BOOKMARKS_QUERY_ID = "fjf5b5Lu82lYMSBRhppK2g";
@@ -95,9 +95,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     importBookmarks()
       .then((r) => sendResponse({ ok: true, ...r }))
       .catch((err) => sendResponse({ ok: false, error: err?.message ?? "Import failed" }));
-    return true; // keep the channel open for the async response
+    return true;
   }
 });
+
+async function getCookie(name) {
+  try {
+    const all = await chrome.cookies.getAll({ url: "https://x.com" });
+    const matches = all.filter((c) => c.name === name);
+    if (!matches.length) return null;
+    const domain = matches.find((c) => c.domain.startsWith("."));
+    return (domain ?? matches[0]).value;
+  } catch {
+    return null;
+  }
+}
 
 // Map one tweet from X's internal GraphQL shape to the X API v2 shape the app
 // backend already parses.
@@ -151,9 +163,6 @@ function collectIncludes(results) {
   return { users: [...users.values()], media };
 }
 
-// Walk the Bookmarks response and collect every tweet + the pagination cursor.
-// The instruction shape varies, so this searches recursively rather than
-// assuming a fixed instruction type.
 function extractBookmarks(json) {
   const results = [];
   const seen = new Set();
@@ -183,22 +192,8 @@ function extractBookmarks(json) {
   return { results, cursor };
 }
 
-// Read a cookie (including httpOnly) in the extension context.
-async function getCookie(name) {
-  try {
-    const all = await chrome.cookies.getAll({ url: "https://x.com" });
-    const matches = all.filter((c) => c.name === name);
-    if (!matches.length) return null;
-    const domain = matches.find((c) => c.domain.startsWith("."));
-    return (domain ?? matches[0]).value;
-  } catch {
-    return null;
-  }
-}
-
-// Ask the x.com page to fetch a bookmarks page same-origin. The page's own
-// session cookies are sent automatically; the auth token (httpOnly, read in
-// the extension context) is passed in for the Authorization header.
+// Fetch a bookmarks page inside the x.com page (same-origin) so the session
+// cookies are sent. Returns { status, text } for precise error surfacing.
 async function fetchBookmarksViaContent(cursor) {
   const tabs = await chrome.tabs.query({ url: ["*://x.com/*", "*://*.x.com/*"] });
   if (!tabs.length) {
@@ -214,7 +209,7 @@ async function fetchBookmarksViaContent(cursor) {
       const variables = { count: 100, includePromotedContent: false };
       if (cursor) variables.cursor = cursor;
       const url =
-        `/i/api/graphql/${queryId}/Bookmarks?` +
+        `https://x.com/i/api/graphql/${queryId}/Bookmarks?` +
         `variables=${encodeURIComponent(JSON.stringify(variables))}&` +
         `features=${encodeURIComponent(JSON.stringify(features))}`;
       const headers = {
@@ -222,18 +217,24 @@ async function fetchBookmarksViaContent(cursor) {
         authorization: `Bearer ${bearer}`,
       };
       if (ct0) headers["x-csrf-token"] = ct0;
-      const res = await fetch(url, { headers, credentials: "same-origin" });
-      if (!res.ok) {
-        throw new Error(`X returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      try {
+        const res = await fetch(url, { headers, credentials: "include" });
+        const text = await res.text();
+        return { status: res.status, text };
+      } catch (err) {
+        return { status: 0, text: "x fetch failed: " + (err?.message ?? String(err)) };
       }
-      return res.json();
     },
     args: [
       { ct0, cursor, queryId: BOOKMARKS_QUERY_ID, features: BOOKMARKS_FEATURES, bearer: X_PUBLIC_BEARER },
     ],
   });
 
-  return result.result;
+  const { status, text } = result?.result ?? { status: 0, text: "no result" };
+  if (status !== 200) {
+    throw new Error(`X returned ${status}: ${(text || "").slice(0, 300)}`);
+  }
+  return JSON.parse(text);
 }
 
 async function importBookmarks() {
@@ -247,9 +248,7 @@ async function importBookmarks() {
     const { results, cursor: next } = extractBookmarks(json);
     if (!results.length) {
       if (page === 0) {
-        throw new Error(
-          "No bookmarks parsed from X response: " + JSON.stringify(json).slice(0, 600)
-        );
+        throw new Error("No bookmarks parsed from X response: " + JSON.stringify(json).slice(0, 600));
       }
       break;
     }
@@ -257,12 +256,17 @@ async function importBookmarks() {
     const tweets = results.map(normalizeTweet).filter((t) => t.id);
     const includes = collectIncludes(results);
 
-    const res = await fetch(`${appUrl}/api/extension/import-bookmarks`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ data: tweets, includes }),
-    });
+    let res;
+    try {
+      res = await fetch(`${appUrl}/api/extension/import-bookmarks`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ data: tweets, includes }),
+      });
+    } catch (err) {
+      throw new Error(`App POST failed (${appUrl}): ${err?.message ?? err}`);
+    }
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(out.error || `Import failed (${res.status})`);
 
