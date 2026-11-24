@@ -32,7 +32,7 @@ interface ExploreClientProps {
   hasXConnection: boolean;
 }
 
-type SearchMode = "keyword" | "semantic";
+type SearchMode = "keyword" | "natural";
 
 export function ExploreClient({
   feed,
@@ -107,9 +107,9 @@ export function ExploreClient({
     navigate({ q: "", page: 1 });
   };
 
-  // Semantic search — debounced client-side fetch over the vector index.
+  // Natural-language search — Gemini interprets the query into tags + terms.
   useEffect(() => {
-    if (searchMode !== "semantic" || !query.trim()) {
+    if (searchMode !== "natural" || !query.trim()) {
       setSemanticPosts([]);
       setSemanticError(null);
       setSemanticLoading(false);
@@ -121,24 +121,13 @@ export function ExploreClient({
       setSemanticLoading(true);
       setSemanticError(null);
       try {
-        const params = new URLSearchParams({ q: query.trim() });
-        if (tag) params.set("tag", tag);
-        if (type) params.set("type", type);
-        if (date) params.set("date", date);
-        if (year) params.set("year", year);
-        if (author) params.set("author", author);
-
-        const res = await fetch(`/api/search/semantic?${params}`, {
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/search/nl?q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
+        );
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Search failed");
-        if (data.unavailable) {
-          setSemanticError("Semantic search is not configured.");
-          setSemanticPosts([]);
-        } else {
-          setSemanticPosts(data.posts ?? []);
-        }
+        setSemanticPosts(data.posts ?? []);
       } catch (err) {
         if (!controller.signal.aborted) {
           setSemanticError(
@@ -148,15 +137,15 @@ export function ExploreClient({
       } finally {
         if (!controller.signal.aborted) setSemanticLoading(false);
       }
-    }, 300);
+    }, 400);
 
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [searchMode, query, tag, type, date, year, author]);
+  }, [searchMode, query]);
 
-  const semanticActive = searchMode === "semantic" && !!query.trim();
+  const semanticActive = searchMode === "natural" && !!query.trim();
   const visiblePosts = semanticActive ? semanticPosts : feed;
   const hasFilter = !!(q || tag || read || type || date || year || author);
 
@@ -184,14 +173,14 @@ export function ExploreClient({
             </button>
             <button
               type="button"
-              onClick={() => setSearchMode("semantic")}
+              onClick={() => setSearchMode("natural")}
               className={`rounded px-2 py-0.5 transition-colors ${
-                searchMode === "semantic"
+                searchMode === "natural"
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Semantic
+              Natural
             </button>
           </div>
           <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">

@@ -119,3 +119,60 @@ export async function askGemini(params: {
   if (!answer.trim()) throw new Error("Gemini returned an empty response");
   return answer.trim();
 }
+
+/** Interpret a natural-language search into tags + free-text terms. */
+export async function interpretSearchQuery(
+  apiKey: string,
+  query: string,
+  allTags: string[]
+): Promise<{ tags: string[]; terms: string[] }> {
+  const prompt =
+    "Convert the user's natural-language search into structured parameters.\n" +
+    `Available tags on their saved posts: ${JSON.stringify(allTags)}\n` +
+    `Query: "${query}"\n\n` +
+    'Respond with ONLY a JSON object: {"tags":["..."],"terms":["..."]}. ' +
+    '"tags" = tags from the available list that match the user intent (lowercase). ' +
+    '"terms" = free-text keywords to match in the post body (lowercase). ' +
+    "Empty arrays mean no filter.";
+
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 200 },
+  };
+
+  const res = await fetch(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`Gemini error (${res.status})`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await res.json();
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ?.map((p: any) => p.text)
+      .join("") ?? "";
+
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return { tags: [], terms: [query.toLowerCase()] };
+  try {
+    const parsed = JSON.parse(match[0]);
+    return {
+      tags: Array.isArray(parsed.tags)
+        ? parsed.tags.filter((t: unknown): t is string => typeof t === "string").map((t: string) => t.toLowerCase())
+        : [],
+      terms: Array.isArray(parsed.terms)
+        ? parsed.terms.filter((t: unknown): t is string => typeof t === "string").map((t: string) => t.toLowerCase())
+        : [],
+    };
+  } catch {
+    return { tags: [], terms: [query.toLowerCase()] };
+  }
+}
