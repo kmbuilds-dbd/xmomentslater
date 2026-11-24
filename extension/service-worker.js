@@ -143,9 +143,11 @@ function collectIncludes(results) {
     if (u?.rest_id && !users.has(u.rest_id)) {
       users.set(u.rest_id, {
         id: u.rest_id,
-        name: u.legacy?.name ?? "",
-        username: u.legacy?.screen_name ?? "",
-        profile_image_url: u.legacy?.profile_image_url_https,
+        // X 2026 schema: `legacy` is gone from user objects; the name and
+        // handle now live under the nested `core` object.
+        name: u?.core?.name ?? u?.legacy?.name ?? "",
+        username: u?.core?.screen_name ?? u?.legacy?.screen_name ?? "",
+        profile_image_url: u?.avatar?.image_url ?? u?.legacy?.profile_image_url_https,
       });
     }
     const m = r?.legacy?.extended_entities?.media ?? r?.legacy?.entities?.media ?? [];
