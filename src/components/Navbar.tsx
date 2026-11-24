@@ -37,7 +37,7 @@ export function Navbar() {
   return (
     <header className="border-b px-6 py-4 flex items-center justify-between">
       <Link
-        href="/dashboard"
+        href="/dashboard/reader"
         className="font-[family-name:var(--font-fraunces)] text-lg font-semibold tracking-tight hover:opacity-80 transition-opacity"
       >
         xMomentsLater

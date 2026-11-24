@@ -6,7 +6,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Bookmark,
   Tag,
   Archive,
   Clock,
@@ -114,10 +113,6 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
             Curation
           </p>
           <div className="mt-1 space-y-0.5">
-            <Link href="/dashboard" className={navLink(false)}>
-              <Bookmark className="h-4 w-4" />
-              All Bookmarks
-            </Link>
             <Link href="/dashboard/reader" className={navLink(pathname === "/dashboard/reader")}>
               <Search className="h-4 w-4" />
               Explore
