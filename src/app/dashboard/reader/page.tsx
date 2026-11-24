@@ -177,6 +177,11 @@ export default async function ReaderPage({ searchParams }: Props) {
 
   const totalPages = Math.max(1, Math.ceil((feedCount ?? 0) / PAGE_SIZE));
 
+  const { data: xConnection } = await supabase
+    .from("x_connections")
+    .select("x_handle")
+    .single();
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-8">
       <ExploreClient
@@ -198,6 +203,7 @@ export default async function ReaderPage({ searchParams }: Props) {
         authors={authors}
         labels={labels}
         years={years}
+        hasXConnection={!!xConnection}
       />
     </main>
   );

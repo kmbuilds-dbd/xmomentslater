@@ -7,6 +7,7 @@ import { SmartSections } from "@/components/SmartSections";
 import { ExplorePostCard } from "@/components/ExplorePostCard";
 import { ReaderDrawer } from "@/components/ReaderDrawer";
 import { FilterToolbar } from "@/components/FilterToolbar";
+import { ImportBookmarksButton } from "@/components/ImportBookmarksButton";
 import type { ReaderPost, SmartSection } from "@/lib/reader";
 
 interface ExploreClientProps {
@@ -28,6 +29,7 @@ interface ExploreClientProps {
   authors: string[];
   labels: string[];
   years: string[];
+  hasXConnection: boolean;
 }
 
 export function ExploreClient({
@@ -49,6 +51,7 @@ export function ExploreClient({
   authors,
   labels,
   years,
+  hasXConnection,
 }: ExploreClientProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<ReaderPost | null>(null);
@@ -106,6 +109,7 @@ export function ExploreClient({
         <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground">
           {totalCount}
         </span>
+        <ImportBookmarksButton hasXConnection={hasXConnection} />
         <form onSubmit={submitSearch} className="ml-auto flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
