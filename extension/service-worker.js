@@ -147,32 +147,35 @@ function collectIncludes(results) {
   return { users: [...users.values()], media };
 }
 
-// Walk the Bookmarks timeline instructions and collect tweet results + cursor.
+// Walk the Bookmarks response and collect every tweet + the pagination cursor.
+// The instruction shape varies, so this searches recursively rather than
+// assuming a fixed instruction type.
 function extractBookmarks(json) {
-  const instructions =
-    json?.data?.bookmark_timeline_v2?.timeline?.instructions ?? [];
   const results = [];
+  const seen = new Set();
   let cursor = null;
-  for (const instr of instructions) {
-    if (instr?.type === "TimelineAddEntries") {
-      for (const entry of instr.entries ?? []) {
-        const result = entry?.content?.itemContent?.tweet_results?.result;
-        if (result?.rest_id) results.push(result);
-      }
-    } else if (instr?.type === "TimelineReplaceEntry") {
-      const result = instr?.entry?.content?.itemContent?.tweet_results?.result;
-      if (result?.rest_id) results.push(result);
+
+  function walk(node) {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
     }
-  }
-  for (const instr of instructions) {
-    if (instr?.type === "TimelineAddEntries") {
-      for (const entry of instr.entries ?? []) {
-        if (entry?.content?.entryType === "TimelineTimelineCursor" && entry?.content?.value) {
-          cursor = entry.content.value;
-        }
+    if (node.__typename === "Tweet" && node.rest_id) {
+      if (!seen.has(node.rest_id)) {
+        seen.add(node.rest_id);
+        results.push(node);
       }
+      return;
     }
+    if (node.entryType === "TimelineTimelineCursor" && node.value) {
+      cursor = node.value;
+      return;
+    }
+    for (const key of Object.keys(node)) walk(node[key]);
   }
+
+  walk(json);
   return { results, cursor };
 }
 
