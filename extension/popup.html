@@ -35,6 +35,12 @@
         opacity: 0.5;
         cursor: default;
       }
+      button.secondary {
+        background: transparent;
+        color: #e7e4df;
+        border: 1px solid #3a3a3e;
+        margin-top: 8px;
+      }
       #status {
         margin-top: 10px;
         min-height: 16px;
@@ -52,6 +58,7 @@
     <h1>xMomentsLater</h1>
     <p>Import your X bookmarks using your signed-in session.</p>
     <button id="import">Import bookmarks</button>
+    <button id="fixAuthors" class="secondary">Fix authors</button>
     <div id="status"></div>
     <script src="popup.js"></script>
   </body>

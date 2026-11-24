@@ -100,6 +100,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((err) => sendResponse({ ok: false, error: err?.message ?? "Import failed" }));
     return true;
   }
+
+  if (message?.type === "xml-fix-authors") {
+    fixAuthors()
+      .then((r) => sendResponse({ ok: true, ...r }))
+      .catch((err) => sendResponse({ ok: false, error: err?.message ?? "Fix failed" }));
+    return true;
+  }
 });
 
 async function getCookie(name) {
@@ -288,4 +295,38 @@ async function importBookmarks() {
   }
 
   return { imported, skipped };
+}
+
+// Re-fetch all bookmarks and rewrite author name/handle on already-saved posts
+// (fixes the "Unknown" authors from before the 2026 schema fix).
+async function fixAuthors() {
+  const appUrl = await getAppUrl();
+
+  let cursor;
+  let updated = 0;
+  let skipped = 0;
+  for (let page = 0; page < 20; page++) {
+    const json = await fetchBookmarksViaContent(cursor);
+    const { results, cursor: next } = extractBookmarks(json);
+    if (!results.length) break;
+
+    const tweets = results.map(normalizeTweet).filter((t) => t.id);
+    const includes = collectIncludes(results);
+
+    const res = await fetch(`${appUrl}/api/extension/fix-authors`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ data: tweets, includes }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || `Fix authors failed (${res.status})`);
+
+    updated += out.updated ?? 0;
+    skipped += out.skipped ?? 0;
+    cursor = next;
+    if (!cursor) break;
+  }
+
+  return { updated, skipped };
 }
