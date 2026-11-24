@@ -23,7 +23,7 @@ export function ArchiveClient({ posts }: { posts: ReaderPost[] }) {
         )}
       </section>
 
-      <ReaderDrawer post={selected} onClose={() => setSelected(null)} />
+      <ReaderDrawer key={selected?.id ?? "closed"} post={selected} onClose={() => setSelected(null)} />
     </>
   );
 }

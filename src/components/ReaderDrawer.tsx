@@ -14,13 +14,6 @@ interface ReaderDrawerProps {
 
 export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
   const [askOpen, setAskOpen] = useState(false);
-  const [prevPostId, setPrevPostId] = useState<string | null>(post?.id ?? null);
-
-  // Reset the chat when switching posts (state adjustment during render).
-  if (post?.id !== prevPostId) {
-    setPrevPostId(post?.id ?? null);
-    setAskOpen(false);
-  }
 
   // Auto-mark read when a post is opened in the drawer.
   useEffect(() => {
