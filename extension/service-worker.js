@@ -2,6 +2,10 @@ const DEFAULT_APP_URL = "http://localhost:3001";
 
 // Live values captured from X's web client on the bookmarks page.
 const BOOKMARKS_QUERY_ID = "fjf5b5Lu82lYMSBRhppK2g";
+// X's public bearer token — the same fixed value every X web client uses for
+// GraphQL requests. User identity comes from the auth_token + ct0 cookies.
+const X_PUBLIC_BEARER =
+  "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs=1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
 const BOOKMARKS_FEATURES = {
   rweb_video_screen_enabled: false,
   rweb_cashtags_enabled: true,
@@ -201,21 +205,22 @@ async function fetchBookmarksViaContent(cursor) {
     throw new Error("Open x.com in a tab, then retry.");
   }
 
-  const authToken = await getCookie("auth_token");
   const ct0 = await getCookie("ct0");
 
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: tabs[0].id },
     func: async (args) => {
-      const { authToken, ct0, cursor, queryId, features } = args;
+      const { ct0, cursor, queryId, features, bearer } = args;
       const variables = { count: 100, includePromotedContent: false };
       if (cursor) variables.cursor = cursor;
       const url =
         `/i/api/graphql/${queryId}/Bookmarks?` +
         `variables=${encodeURIComponent(JSON.stringify(variables))}&` +
         `features=${encodeURIComponent(JSON.stringify(features))}`;
-      const headers = { "content-type": "application/json" };
-      if (authToken) headers.authorization = `Bearer ${authToken}`;
+      const headers = {
+        "content-type": "application/json",
+        authorization: `Bearer ${bearer}`,
+      };
       if (ct0) headers["x-csrf-token"] = ct0;
       const res = await fetch(url, { headers, credentials: "same-origin" });
       if (!res.ok) {
@@ -224,7 +229,7 @@ async function fetchBookmarksViaContent(cursor) {
       return res.json();
     },
     args: [
-      { authToken, ct0, cursor, queryId: BOOKMARKS_QUERY_ID, features: BOOKMARKS_FEATURES },
+      { ct0, cursor, queryId: BOOKMARKS_QUERY_ID, features: BOOKMARKS_FEATURES, bearer: X_PUBLIC_BEARER },
     ],
   });
 
