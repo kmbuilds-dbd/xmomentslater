@@ -3,7 +3,7 @@
   "name": "xMomentsLater for X",
   "description": "Save X posts and import your X bookmarks into xMomentsLater using your signed-in session.",
   "version": "0.2.0",
-  "permissions": ["storage", "windows", "cookies"],
+  "permissions": ["storage", "windows", "cookies", "scripting"],
   "host_permissions": [
     "https://x.com/*",
     "https://*.x.com/*",

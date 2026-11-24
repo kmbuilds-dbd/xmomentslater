@@ -129,22 +129,54 @@ function extractBookmarks(json) {
   return { results, cursor };
 }
 
-// Ask the content script on x.com to fetch a bookmarks page same-origin, so the
-// request carries the page's own live session cookies (auth_token is httpOnly
-// and can't be read by page JS, but a same-origin fetch sends it automatically).
+// Read a cookie (including httpOnly) in the extension context.
+async function getCookie(name) {
+  try {
+    const all = await chrome.cookies.getAll({ url: "https://x.com" });
+    const matches = all.filter((c) => c.name === name);
+    if (!matches.length) return null;
+    const domain = matches.find((c) => c.domain.startsWith("."));
+    return (domain ?? matches[0]).value;
+  } catch {
+    return null;
+  }
+}
+
+// Ask the x.com page to fetch a bookmarks page same-origin. The page's own
+// session cookies are sent automatically; the auth token (httpOnly, read in
+// the extension context) is passed in for the Authorization header.
 async function fetchBookmarksViaContent(cursor) {
   const tabs = await chrome.tabs.query({ url: ["*://x.com/*", "*://*.x.com/*"] });
   if (!tabs.length) {
     throw new Error("Open x.com in a tab, then retry.");
   }
-  const resp = await chrome.tabs.sendMessage(tabs[0].id, {
-    type: "xml-fetch-bookmarks",
-    cursor,
+
+  const authToken = await getCookie("auth_token");
+  const ct0 = await getCookie("ct0");
+
+  const [result] = await chrome.scripting.executeScript({
+    target: { tabId: tabs[0].id },
+    func: async (args) => {
+      const { authToken, ct0, cursor, queryId } = args;
+      const variables = { count: 100, includePromotedContent: false };
+      if (cursor) variables.cursor = cursor;
+      const url =
+        `/i/api/graphql/${queryId}/Bookmarks?` +
+        `variables=${encodeURIComponent(JSON.stringify(variables))}&` +
+        `features=${encodeURIComponent(JSON.stringify({}))}`;
+      const headers = { "content-type": "application/json" };
+      if (authToken) headers.authorization = `Bearer ${authToken}`;
+      if (ct0) headers["x-csrf-token"] = ct0;
+      const res = await fetch(url, { headers, credentials: "same-origin" });
+      if (!res.ok) {
+        throw new Error(`X returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      }
+      return res.json();
+    },
+    args: [{ authToken, ct0, cursor, queryId: "X1TiFAk2aL2JpX2ZRZR2xA" }],
   });
-  if (!resp?.ok) {
-    throw new Error(resp?.error || "Fetch failed");
-  }
-  return resp.json;
+
+  return result.result;
 }
 
 async function importBookmarks() {
