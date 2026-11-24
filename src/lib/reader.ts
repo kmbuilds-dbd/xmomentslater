@@ -4,7 +4,7 @@ import { mapSavedPostToLibraryPost, type SavedPostRow } from "@/lib/saved-posts"
 export type PostKind = "article" | "video" | "image" | "text";
 
 export interface ReaderBlock {
-  type: "text" | "image" | "heading" | "quote";
+  type: "text" | "image" | "heading" | "quote" | "thread";
   content: string;
 }
 

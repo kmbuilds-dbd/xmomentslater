@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseTweet, type XApiTweetResponse } from "@/lib/parser";
+import { parseTweet, blocksToText, type XApiTweetResponse } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
 import { generateTags } from "@/lib/generate-tags";
 import { indexSavedPostVector } from "@/lib/vector-search";
@@ -54,7 +54,7 @@ async function touchLastSync(admin: SupabaseClient, userId: string): Promise<voi
  * Shared by both the single-page (manual, progress-reporting) and
  * multi-page (cron, unattended) sync entry points below.
  */
-async function processBookmarkPage(
+export async function processBookmarkPage(
   page: BookmarksResponse,
   conn: SyncConnection,
   admin: SupabaseClient
@@ -84,10 +84,7 @@ async function processBookmarkPage(
     const parsed = parseTweet(singleResponse);
 
     const title = parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
-    const textContent = parsed.blocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.content)
-      .join("\n\n");
+    const textContent = blocksToText(parsed.blocks);
 
     let summary: string | null = null;
     try {

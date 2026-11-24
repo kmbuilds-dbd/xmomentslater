@@ -66,6 +66,16 @@ export function ReaderBody({ post }: { post: ReaderPost }) {
               </blockquote>
             );
           }
+          if (block.type === "thread") {
+            return (
+              <p
+                key={i}
+                className="whitespace-pre-wrap border-t border-border/60 pt-5 text-foreground"
+              >
+                {block.content}
+              </p>
+            );
+          }
           return (
             <p key={i} className="whitespace-pre-wrap text-foreground">
               {block.content}

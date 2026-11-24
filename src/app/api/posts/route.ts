@@ -1,13 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { parseTweet } from "@/lib/parser";
+import { parseTweet, blocksToText, fetchThreadConversation, threadKeys, unrollThread } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
 import {
   deleteSavedPostVector,
   indexSavedPostVector,
 } from "@/lib/vector-search";
-import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
+import { fetchTweetWithRefresh, withTokenRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 // PATCH — mark read / unread, archive / unarchive
 export async function PATCH(request: NextRequest) {
@@ -138,13 +138,31 @@ export async function PUT(request: NextRequest) {
     // Re-parse (article field in tweet.fields handles X Articles automatically)
     const parsed = parseTweet(rawResponse);
 
+    // Unroll a thread when this tweet is a reply or has replies.
+    const threadInfo = threadKeys(rawResponse);
+    if (threadInfo) {
+      try {
+        const thread = await withTokenRefresh(
+          (token) =>
+            fetchThreadConversation(
+              token,
+              threadInfo.conversationId,
+              threadInfo.authorHandle
+            ),
+          connection,
+          user.id,
+          admin
+        );
+        unrollThread(parsed, rawResponse, thread);
+      } catch (err) {
+        console.error("Thread unroll failed:", err);
+      }
+    }
+
     // Regenerate title and summary
     const title =
       parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
-    const textContent = parsed.blocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.content)
-      .join("\n\n");
+    const textContent = blocksToText(parsed.blocks);
     let summary: string | null = null;
     try {
       summary = await generateSummary(textContent, title ?? undefined);

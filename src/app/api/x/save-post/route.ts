@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { extractPostId, parseTweet } from "@/lib/parser";
+import { extractPostId, parseTweet, blocksToText, fetchThreadConversation, threadKeys, unrollThread } from "@/lib/parser";
 import { generateSummary } from "@/lib/summarize";
 import { generateTags } from "@/lib/generate-tags";
 import { indexSavedPostVector } from "@/lib/vector-search";
-import { fetchTweetWithRefresh } from "@/lib/x-api/fetch-with-refresh";
+import { fetchTweetWithRefresh, withTokenRefresh } from "@/lib/x-api/fetch-with-refresh";
 
 export async function POST(request: NextRequest) {
   try {
@@ -111,13 +111,31 @@ export async function POST(request: NextRequest) {
     // 7. Parse into structured content (article field handles X Articles automatically)
     const parsed = parseTweet(rawResponse);
 
+    // 7b. Unroll a thread when this tweet is a reply or has replies.
+    const threadInfo = threadKeys(rawResponse);
+    if (threadInfo) {
+      try {
+        const thread = await withTokenRefresh(
+          (token) =>
+            fetchThreadConversation(
+              token,
+              threadInfo.conversationId,
+              threadInfo.authorHandle
+            ),
+          connection,
+          userId,
+          admin
+        );
+        unrollThread(parsed, rawResponse, thread);
+      } catch (err) {
+        console.error("Thread unroll failed:", err);
+      }
+    }
+
     // 8. Extract title and generate LLM summary
     const title =
       parsed.blocks.find((b) => b.type === "heading")?.content ?? null;
-    const textContent = parsed.blocks
-      .filter((b) => b.type === "text")
-      .map((b) => b.content)
-      .join("\n\n");
+    const textContent = blocksToText(parsed.blocks);
     let summary: string | null = null;
     try {
       summary = await generateSummary(textContent, title ?? undefined);

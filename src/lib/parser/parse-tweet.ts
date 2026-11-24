@@ -1,6 +1,6 @@
 import type { XApiTweetResponse } from "./fetch-tweet";
 
-export type BlockType = "text" | "image" | "heading" | "quote";
+export type BlockType = "text" | "image" | "heading" | "quote" | "thread";
 
 export interface ParsedContent {
   author: string;
@@ -25,6 +25,14 @@ function mediaToImageBlock(media: Media): Block | null {
     return { type: "image", content: media.preview_image_url };
   }
   return null;
+}
+
+/** Join prose blocks (text, quoted tweets, thread posts) for search and AI context. */
+export function blocksToText(blocks: ParsedContent["blocks"]): string {
+  return blocks
+    .filter((b) => b.type === "text" || b.type === "quote" || b.type === "thread")
+    .map((b) => b.content)
+    .join("\n\n");
 }
 
 /**

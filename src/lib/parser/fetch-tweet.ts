@@ -25,6 +25,8 @@ export interface XApiTweetResponse {
     };
     attachments?: { media_keys?: string[] };
     referenced_tweets?: Array<{ type: string; id: string }>;
+    conversation_id?: string;
+    public_metrics?: { reply_count?: number };
   };
   includes?: {
     users?: Array<{ id: string; name: string; username: string; profile_image_url?: string }>;
@@ -45,7 +47,7 @@ export class XApiError extends Error {
 const X_TWEETS_URL = "https://api.x.com/2/tweets";
 
 const TWEET_FIELDS =
-  "text,created_at,author_id,entities,note_tweet,attachments,article,referenced_tweets";
+  "text,created_at,author_id,entities,note_tweet,attachments,article,referenced_tweets,conversation_id,public_metrics";
 
 function buildParams(): URLSearchParams {
   return new URLSearchParams({
