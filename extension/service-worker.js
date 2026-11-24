@@ -240,7 +240,14 @@ async function importBookmarks() {
   for (let page = 0; page < 20; page++) {
     const json = await fetchBookmarksViaContent(cursor);
     const { results, cursor: next } = extractBookmarks(json);
-    if (!results.length) break;
+    if (!results.length) {
+      if (page === 0) {
+        throw new Error(
+          "No bookmarks parsed from X response: " + JSON.stringify(json).slice(0, 600)
+        );
+      }
+      break;
+    }
 
     const tweets = results.map(normalizeTweet).filter((t) => t.id);
     const includes = collectIncludes(results);
