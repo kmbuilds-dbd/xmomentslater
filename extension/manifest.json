@@ -1,9 +1,19 @@
 {
   "manifest_version": 3,
   "name": "xMomentsLater for X",
-  "description": "Add a Save to xMomentsLater button beside X's bookmark button.",
-  "version": "0.1.0",
-  "permissions": ["storage", "windows"],
+  "description": "Save X posts and import your X bookmarks into xMomentsLater using your signed-in session.",
+  "version": "0.2.0",
+  "permissions": ["storage", "windows", "cookies"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://*.x.com/*",
+    "https://*.up.railway.app/*",
+    "http://localhost/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "xMomentsLater import"
+  },
   "content_scripts": [
     {
       "matches": ["*://x.com/*", "*://*.x.com/*", "*://twitter.com/*", "*://*.twitter.com/*"],

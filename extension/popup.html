@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #131316;
+        color: #e7e4df;
+        font-size: 13px;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 4px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #8a8a8b;
+        line-height: 1.4;
+      }
+      button {
+        width: 100%;
+        padding: 9px 12px;
+        border: none;
+        border-radius: 8px;
+        background: #c9835f;
+        color: #0b0907;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status {
+        margin-top: 10px;
+        min-height: 16px;
+        color: #8a8a8b;
+      }
+      #status.error {
+        color: #ee6e6c;
+      }
+      #status.ok {
+        color: #6fbf73;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>xMomentsLater</h1>
+    <p>Import your X bookmarks using your signed-in session.</p>
+    <button id="import">Import bookmarks</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
