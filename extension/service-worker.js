@@ -55,8 +55,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function getCookie(name) {
   try {
-    const c = await chrome.cookies.get({ url: "https://x.com", name });
-    return c?.value ?? null;
+    // getAll returns exactly the cookies the browser would send to x.com,
+    // which mirrors how X's own client (and the CLI tools that work) read them.
+    const all = await chrome.cookies.getAll({ url: "https://x.com" });
+    const matches = all.filter((c) => c.name === name);
+    if (!matches.length) return null;
+    // A stale host-only cookie can shadow the live .x.com session cookie.
+    const domain = matches.find((c) => c.domain.startsWith("."));
+    return (domain ?? matches[0]).value;
   } catch {
     return null;
   }
