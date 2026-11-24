@@ -54,12 +54,18 @@ function rawMediaList(raw: unknown): RawMedia[] {
  * every card would pick the same first image. */
 function ownMedia(raw: unknown): RawMedia[] {
   const all = rawMediaList(raw);
-  if (!raw || typeof raw !== "object" || !("data" in raw)) return all;
-  const data = (raw as { data?: { attachments?: { media_keys?: string[] } } }).data;
+  if (!raw || typeof raw !== "object" || !("data" in raw)) return [];
+  const data = (raw as {
+    data?: { attachments?: { media_keys?: string[] }; article?: unknown };
+  }).data;
   const keys = data?.attachments?.media_keys;
-  if (!keys || keys.length === 0) return all;
-  const keySet = new Set(keys);
-  return all.filter((m) => m.media_key && keySet.has(m.media_key));
+  if (keys && keys.length > 0) {
+    const keySet = new Set(keys);
+    return all.filter((m) => m.media_key && keySet.has(m.media_key));
+  }
+  // Articles keep their media in includes.media without attachment keys; a
+  // plain text post has no media at all.
+  return data?.article ? all : [];
 }
 
 function detectKind(raw: unknown): PostKind {
