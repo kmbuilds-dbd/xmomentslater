@@ -1,10 +1,5 @@
 const DEFAULT_APP_URL = "http://localhost:3001";
 
-// X's internal GraphQL query id for the Bookmarks timeline. This hash changes
-// occasionally on X's side; if imports start 404ing, update it here (or in
-// options). See README for how to find the current value.
-const BOOKMARKS_QUERY_ID = "X1TiFAk2aL2JpX2ZRZR2xA";
-
 function normalizeAppUrl(value) {
   try {
     const url = new URL(value);
@@ -52,21 +47,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true; // keep the channel open for the async response
   }
 });
-
-async function getCookie(name) {
-  try {
-    // getAll returns exactly the cookies the browser would send to x.com,
-    // which mirrors how X's own client (and the CLI tools that work) read them.
-    const all = await chrome.cookies.getAll({ url: "https://x.com" });
-    const matches = all.filter((c) => c.name === name);
-    if (!matches.length) return null;
-    // A stale host-only cookie can shadow the live .x.com session cookie.
-    const domain = matches.find((c) => c.domain.startsWith("."));
-    return (domain ?? matches[0]).value;
-  } catch {
-    return null;
-  }
-}
 
 // Map one tweet from X's internal GraphQL shape to the X API v2 shape the app
 // backend already parses.
@@ -137,7 +117,6 @@ function extractBookmarks(json) {
       if (result?.rest_id) results.push(result);
     }
   }
-  // The bottom cursor entry.
   for (const instr of instructions) {
     if (instr?.type === "TimelineAddEntries") {
       for (const entry of instr.entries ?? []) {
@@ -150,43 +129,32 @@ function extractBookmarks(json) {
   return { results, cursor };
 }
 
-async function fetchBookmarksPage(authToken, ct0, cursor) {
-  const variables = { count: 100, includePromotedContent: false };
-  if (cursor) variables.cursor = cursor;
-  const url =
-    `https://x.com/i/api/graphql/${BOOKMARKS_QUERY_ID}/Bookmarks?` +
-    `variables=${encodeURIComponent(JSON.stringify(variables))}&` +
-    `features=${encodeURIComponent(JSON.stringify({}))}`;
-
-  const res = await fetch(url, {
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      "x-csrf-token": ct0,
-      "content-type": "application/json",
-    },
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`X returned ${res.status}: ${body.slice(0, 300)}`);
+// Ask the content script on x.com to fetch a bookmarks page same-origin, so the
+// request carries the page's own live session cookies (auth_token is httpOnly
+// and can't be read by page JS, but a same-origin fetch sends it automatically).
+async function fetchBookmarksViaContent(cursor) {
+  const tabs = await chrome.tabs.query({ url: ["*://x.com/*", "*://*.x.com/*"] });
+  if (!tabs.length) {
+    throw new Error("Open x.com in a tab, then retry.");
   }
-  return res.json();
+  const resp = await chrome.tabs.sendMessage(tabs[0].id, {
+    type: "xml-fetch-bookmarks",
+    cursor,
+  });
+  if (!resp?.ok) {
+    throw new Error(resp?.error || "Fetch failed");
+  }
+  return resp.json;
 }
 
 async function importBookmarks() {
   const appUrl = await getAppUrl();
-  const authToken = await getCookie("auth_token");
-  const ct0 = await getCookie("ct0");
-  if (!authToken || !ct0) {
-    throw new Error("Sign in to X in this browser first, then retry.");
-  }
 
   let cursor;
   let imported = 0;
   let skipped = 0;
   for (let page = 0; page < 20; page++) {
-    const json = await fetchBookmarksPage(authToken, ct0, cursor);
+    const json = await fetchBookmarksViaContent(cursor);
     const { results, cursor: next } = extractBookmarks(json);
     if (!results.length) break;
 
