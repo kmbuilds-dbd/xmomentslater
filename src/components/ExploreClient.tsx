@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { SmartSections } from "@/components/SmartSections";
@@ -32,6 +32,8 @@ interface ExploreClientProps {
   hasXConnection: boolean;
 }
 
+type SearchMode = "keyword" | "semantic";
+
 export function ExploreClient({
   feed,
   sections,
@@ -56,6 +58,10 @@ export function ExploreClient({
   const router = useRouter();
   const [selected, setSelected] = useState<ReaderPost | null>(null);
   const [query, setQuery] = useState(q);
+  const [searchMode, setSearchMode] = useState<SearchMode>("keyword");
+  const [semanticPosts, setSemanticPosts] = useState<ReaderPost[]>([]);
+  const [semanticLoading, setSemanticLoading] = useState(false);
+  const [semanticError, setSemanticError] = useState<string | null>(null);
 
   const navigate = (patch: Record<string, string | boolean | number>) => {
     const state = {
@@ -91,7 +97,9 @@ export function ExploreClient({
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({ q: query.trim(), page: 1 });
+    if (searchMode === "keyword") {
+      navigate({ q: query.trim(), page: 1 });
+    }
   };
 
   const clearSearch = () => {
@@ -99,6 +107,57 @@ export function ExploreClient({
     navigate({ q: "", page: 1 });
   };
 
+  // Semantic search — debounced client-side fetch over the vector index.
+  useEffect(() => {
+    if (searchMode !== "semantic" || !query.trim()) {
+      setSemanticPosts([]);
+      setSemanticError(null);
+      setSemanticLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSemanticLoading(true);
+      setSemanticError(null);
+      try {
+        const params = new URLSearchParams({ q: query.trim() });
+        if (tag) params.set("tag", tag);
+        if (type) params.set("type", type);
+        if (date) params.set("date", date);
+        if (year) params.set("year", year);
+        if (author) params.set("author", author);
+
+        const res = await fetch(`/api/search/semantic?${params}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Search failed");
+        if (data.unavailable) {
+          setSemanticError("Semantic search is not configured.");
+          setSemanticPosts([]);
+        } else {
+          setSemanticPosts(data.posts ?? []);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setSemanticError(
+            err instanceof Error ? err.message : "Search failed"
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setSemanticLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [searchMode, query, tag, type, date, year, author]);
+
+  const semanticActive = searchMode === "semantic" && !!query.trim();
+  const visiblePosts = semanticActive ? semanticPosts : feed;
   const hasFilter = !!(q || tag || read || type || date || year || author);
 
   return (
@@ -110,19 +169,50 @@ export function ExploreClient({
           {totalCount}
         </span>
         <ImportBookmarksButton hasXConnection={hasXConnection} />
-        <form onSubmit={submitSearch} className="ml-auto flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search…"
-            className="w-40 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {query && (
-            <button type="button" onClick={clearSearch} className="text-muted-foreground hover:text-foreground" aria-label="Clear search">
-              <X className="h-4 w-4" />
+        <form onSubmit={submitSearch} className="ml-auto flex items-center gap-2">
+          <div className="flex shrink-0 rounded-md border border-border p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setSearchMode("keyword")}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                searchMode === "keyword"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Keyword
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setSearchMode("semantic")}
+              className={`rounded px-2 py-0.5 transition-colors ${
+                searchMode === "semantic"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Semantic
+            </button>
+          </div>
+          <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-40 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -155,11 +245,25 @@ export function ExploreClient({
 
       {/* Feed */}
       <section className="mt-8 space-y-3">
-        {hasFilter && (
+        {semanticLoading && <p className="text-sm text-muted-foreground">Searching semantically…</p>}
+        {semanticError && <p className="text-sm text-destructive">{semanticError}</p>}
+        {!semanticLoading && !semanticError && hasFilter && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {feedCount} result{feedCount === 1 ? "" : "s"}
+            {semanticActive ? semanticPosts.length : feedCount} result
+            {(semanticActive ? semanticPosts.length : feedCount) === 1 ? "" : "s"}
             <button
-              onClick={() => navigate({ q: "", tag: "", read: false, type: "", date: "", year: "", author: "", page: 1 })}
+              onClick={() =>
+                navigate({
+                  q: "",
+                  tag: "",
+                  read: false,
+                  type: "",
+                  date: "",
+                  year: "",
+                  author: "",
+                  page: 1,
+                })
+              }
               className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs hover:text-foreground"
             >
               Clear filters
@@ -167,18 +271,24 @@ export function ExploreClient({
             </button>
           </p>
         )}
-        {feed.length > 0 ? (
-          feed.map((p) => <ExplorePostCard key={p.id} post={p} onOpen={setSelected} />)
+        {visiblePosts.length > 0 ? (
+          visiblePosts.map((p) => (
+            <ExplorePostCard key={p.id} post={p} onOpen={setSelected} />
+          ))
         ) : (
-          <div className="rounded-xl border border-dashed px-8 py-16 text-center">
-            <p className="text-lg text-muted-foreground">Nothing here yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              No posts match these filters.
-            </p>
-          </div>
+          !semanticLoading && (
+            <div className="rounded-xl border border-dashed px-8 py-16 text-center">
+              <p className="text-lg text-muted-foreground">Nothing here yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {semanticActive
+                  ? "No semantic matches."
+                  : "No posts match these filters."}
+              </p>
+            </div>
+          )
         )}
 
-        {totalPages > 1 && (
+        {!semanticActive && totalPages > 1 && (
           <div className="flex items-center justify-center gap-4 pt-4">
             <button
               onClick={() => navigate({ page: page - 1 })}

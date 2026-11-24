@@ -1,15 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
-  mapSavedPostToLibraryPost,
-  type SavedPostRow,
-} from "@/lib/saved-posts";
+  mapSavedPostToReaderPost,
+  type ReaderPost,
+} from "@/lib/reader";
+import type { SavedPostRow } from "@/lib/saved-posts";
 import {
   isVectorSearchConfigured,
   searchSavedPostVectors,
 } from "@/lib/vector-search";
 
 const MAX_RESULTS = 100;
+const COLS =
+  "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category, kind";
+
+const DATE_RANGES: Record<string, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -25,10 +34,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ posts: [], unavailable: true });
   }
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-  const tag = request.nextUrl.searchParams.get("tag")?.trim() ?? "";
-  const source = request.nextUrl.searchParams.get("source")?.trim() ?? "";
-  const showRead = request.nextUrl.searchParams.get("showRead") === "true";
+  const sp = request.nextUrl.searchParams;
+  const q = sp.get("q")?.trim() ?? "";
+  const tag = sp.get("tag")?.trim() ?? "";
+  const type = sp.get("type")?.trim() ?? "";
+  const date = sp.get("date")?.trim() ?? "";
+  const year = sp.get("year")?.trim() ?? "";
+  const author = sp.get("author")?.trim() ?? "";
+  const showRead = sp.get("showRead") === "true";
+
   if (!q) {
     return NextResponse.json({ posts: [] });
   }
@@ -47,22 +61,25 @@ export async function GET(request: NextRequest) {
 
     let postQuery = supabase
       .from("saved_posts")
-      .select(
-        "id, author_name, author_handle, posted_at, saved_at, read_at, tags, x_post_url, parsed_content, raw_api_response, summary, title, source, category"
-      )
-      .in("id", ids);
+      .select(COLS)
+      .in("id", ids)
+      .is("archived_at", null);
 
-    if (source === "manual" || source === "bookmark" || source === "ifttt") {
-      postQuery = postQuery.eq("source", source);
+    if (tag) postQuery = postQuery.contains("tags", [tag]);
+    if (["article", "video", "image", "text"].includes(type)) {
+      postQuery = postQuery.eq("kind", type);
     }
-
-    if (tag) {
-      postQuery = postQuery.contains("tags", [tag]);
+    if (DATE_RANGES[date]) {
+      const since = new Date(Date.now() - DATE_RANGES[date] * 86400000).toISOString();
+      postQuery = postQuery.gte("saved_at", since);
     }
-
-    if (!showRead) {
-      postQuery = postQuery.is("read_at", null);
+    if (/^\d{4}$/.test(year)) {
+      postQuery = postQuery
+        .gte("posted_at", `${year}-01-01T00:00:00.000Z`)
+        .lt("posted_at", `${Number(year) + 1}-01-01T00:00:00.000Z`);
     }
+    if (author) postQuery = postQuery.eq("author_handle", author);
+    if (!showRead) postQuery = postQuery.is("read_at", null);
 
     const { data, error } = await postQuery;
 
@@ -71,10 +88,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Search failed" }, { status: 500 });
     }
 
-    const byId = new Map(
+    const byId = new Map<string, ReaderPost>(
       (data ?? []).map((post) => [
         post.id,
-        mapSavedPostToLibraryPost(post as SavedPostRow),
+        mapSavedPostToReaderPost(post as SavedPostRow),
       ])
     );
     const posts = ids.map((id) => byId.get(id)).filter(Boolean);
