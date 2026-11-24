@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { X, Maximize2, Sparkles } from "lucide-react";
+import { X, Maximize2, Sparkles, RefreshCw } from "lucide-react";
 import { ReaderBody } from "@/components/ReaderBody";
 import { AskAIPanel } from "@/components/AskAIPanel";
-import type { ReaderPost } from "@/lib/reader";
+import type { ReaderPost, ReaderBlock } from "@/lib/reader";
 
 interface ReaderDrawerProps {
   post: ReaderPost | null;
@@ -14,6 +14,8 @@ interface ReaderDrawerProps {
 
 export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
   const [askOpen, setAskOpen] = useState(false);
+  const [displayBlocks, setDisplayBlocks] = useState<ReaderBlock[]>(post?.blocks ?? []);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Auto-mark read when a post is opened in the drawer.
   useEffect(() => {
@@ -26,6 +28,27 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
   }, [post]);
 
   if (!post) return null;
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/posts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: post.id }),
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.parsed?.blocks)) {
+        setDisplayBlocks(data.parsed.blocks);
+      }
+    } catch {
+      // leave content as-is
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const displayPost: ReaderPost = { ...post, blocks: displayBlocks };
 
   return (
     <div
@@ -45,6 +68,15 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
           <X className="h-5 w-5" />
         </button>
         <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-50"
+            aria-label="Refresh"
+            title="Refresh from X"
+          >
+            <RefreshCw className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
           <button
             onClick={() => setAskOpen((v) => !v)}
             className="rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -75,7 +107,7 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
       {askOpen ? (
         <div className="flex min-h-0 flex-1">
           <div className="min-w-0 flex-1 overflow-y-auto border-r border-border px-7 py-2">
-            <ReaderBody post={post} />
+            <ReaderBody post={displayPost} />
           </div>
           <div className="flex min-w-0 w-[45%] flex-col">
             <AskAIPanel post={post} onClose={() => setAskOpen(false)} />
@@ -83,7 +115,7 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-7 pb-12 pt-2">
-          <ReaderBody post={post} />
+          <ReaderBody post={displayPost} />
         </div>
       )}
     </div>
