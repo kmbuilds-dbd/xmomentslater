@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       {
         error: expired
           ? "X session expired. Please reconnect your X account in Settings."
-          : "Failed to sync bookmarks from X.",
+          : message,
       },
       { status: expired ? 401 : 502 }
     );
