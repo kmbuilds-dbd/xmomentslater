@@ -1,5 +1,52 @@
 const DEFAULT_APP_URL = "http://localhost:3001";
 
+// Live values captured from X's web client on the bookmarks page.
+const BOOKMARKS_QUERY_ID = "fjf5b5Lu82lYMSBRhppK2g";
+const BOOKMARKS_FEATURES = {
+  rweb_video_screen_enabled: false,
+  rweb_cashtags_enabled: true,
+  profile_label_improvements_pcf_label_in_post_enabled: true,
+  responsive_web_profile_redirect_enabled: true,
+  rweb_tipjar_consumption_enabled: false,
+  verified_phone_label_enabled: false,
+  creator_subscriptions_tweet_preview_api_enabled: true,
+  responsive_web_graphql_timeline_navigation_enabled: true,
+  premium_content_api_read_enabled: false,
+  communities_web_enable_tweet_community_results_fetch: true,
+  c9s_tweet_anatomy_moderator_badge_enabled: true,
+  responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+  responsive_web_grok_analyze_post_followups_enabled: true,
+  rweb_cashtags_composer_attachment_enabled: true,
+  responsive_web_jetfuel_frame: true,
+  rweb_sports_post_context_enabled: false,
+  x_elections_post_context_enabled: true,
+  responsive_web_grok_share_attachment_enabled: true,
+  responsive_web_grok_annotations_enabled: true,
+  articles_preview_enabled: true,
+  responsive_web_edit_tweet_api_enabled: true,
+  rweb_conversational_replies_downvote_enabled: false,
+  graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+  view_counts_everywhere_api_enabled: true,
+  longform_notetweets_consumption_enabled: true,
+  responsive_web_twitter_article_tweet_consumption_enabled: true,
+  content_disclosure_indicator_enabled: true,
+  content_disclosure_ai_generated_indicator_enabled: true,
+  responsive_web_grok_show_grok_translated_post: true,
+  responsive_web_grok_analysis_button_from_backend: true,
+  post_ctas_fetch_enabled: true,
+  freedom_of_speech_not_reach_fetch_enabled: true,
+  standardized_nudges_misinfo: true,
+  tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+  longform_notetweets_rich_text_read_enabled: true,
+  longform_notetweets_inline_media_enabled: false,
+  responsive_web_nested_quote_preview_enabled: true,
+  responsive_web_grok_image_annotation_enabled: true,
+  responsive_web_grok_imagine_annotation_enabled: true,
+  responsive_web_made_on_x_label_enabled: false,
+  responsive_web_grok_community_note_auto_translation_is_enabled: true,
+  responsive_web_enhance_cards_enabled: false,
+};
+
 function normalizeAppUrl(value) {
   try {
     const url = new URL(value);
@@ -157,13 +204,13 @@ async function fetchBookmarksViaContent(cursor) {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: tabs[0].id },
     func: async (args) => {
-      const { authToken, ct0, cursor, queryId } = args;
+      const { authToken, ct0, cursor, queryId, features } = args;
       const variables = { count: 100, includePromotedContent: false };
       if (cursor) variables.cursor = cursor;
       const url =
         `/i/api/graphql/${queryId}/Bookmarks?` +
         `variables=${encodeURIComponent(JSON.stringify(variables))}&` +
-        `features=${encodeURIComponent(JSON.stringify({}))}`;
+        `features=${encodeURIComponent(JSON.stringify(features))}`;
       const headers = { "content-type": "application/json" };
       if (authToken) headers.authorization = `Bearer ${authToken}`;
       if (ct0) headers["x-csrf-token"] = ct0;
@@ -173,7 +220,9 @@ async function fetchBookmarksViaContent(cursor) {
       }
       return res.json();
     },
-    args: [{ authToken, ct0, cursor, queryId: "X1TiFAk2aL2JpX2ZRZR2xA" }],
+    args: [
+      { authToken, ct0, cursor, queryId: BOOKMARKS_QUERY_ID, features: BOOKMARKS_FEATURES },
+    ],
   });
 
   return result.result;
