@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sparkles, X, ArrowUp } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import type { ReaderPost } from "@/lib/reader";
 
 interface Msg {
@@ -15,6 +16,45 @@ const SUGGESTIONS = [
   { label: "Find related saves", prompt: "What topics or themes does this post relate to? Suggest related searches I could run." },
   { label: "Draft a post", prompt: "Draft a short X post inspired by this." },
 ];
+
+function AssistantMessage({ children }: { children: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card px-4 py-3 text-base leading-7 text-card-foreground">
+      <ReactMarkdown
+        components={{
+          h1: ({ children }) => <h3 className="mb-2 text-lg font-semibold leading-6">{children}</h3>,
+          h2: ({ children }) => <h3 className="mb-2 text-base font-semibold leading-6">{children}</h3>,
+          h3: ({ children }) => <h4 className="mb-2 font-semibold leading-6">{children}</h4>,
+          p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+          ul: ({ children }) => <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
+          ol: ({ children }) => <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
+          li: ({ children }) => <li className="pl-1">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          a: ({ children, href }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+            >
+              {children}
+            </a>
+          ),
+          code: ({ children }) => (
+            <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[0.85em]">{children}</code>
+          ),
+          pre: ({ children }) => (
+            <pre className="mb-3 overflow-x-auto rounded-lg bg-secondary p-3 text-sm leading-6 last:mb-0">
+              {children}
+            </pre>
+          ),
+        }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 export function AskAIPanel({ post, onClose }: { post: ReaderPost; onClose: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -95,9 +135,7 @@ export function AskAIPanel({ post, onClose }: { post: ReaderPost; onClose: () =>
               </div>
             </div>
           ) : (
-            <div key={i} className="rounded-xl border border-border bg-card px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-              {m.text}
-            </div>
+            <AssistantMessage key={i}>{m.text}</AssistantMessage>
           )
         )}
 
