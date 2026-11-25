@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { ReaderSidebar } from "@/components/ReaderSidebar";
+import { ReaderShell } from "@/components/ReaderShell";
 
 export default async function ReaderLayout({
   children,
@@ -24,9 +24,8 @@ export default async function ReaderLayout({
     .map(([tag, count]) => ({ tag, count }));
 
   return (
-    <div className="flex min-h-screen font-[family-name:var(--font-inter)]">
-      <ReaderSidebar userEmail={user?.email ?? ""} topLabels={topLabels} />
-      <div className="flex-1 min-w-0">{children}</div>
-    </div>
+    <ReaderShell userEmail={user?.email ?? ""} topLabels={topLabels}>
+      {children}
+    </ReaderShell>
   );
 }

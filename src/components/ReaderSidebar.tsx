@@ -27,9 +27,10 @@ interface TopLabel {
 interface ReaderSidebarProps {
   userEmail: string;
   topLabels: TopLabel[];
+  onNavigate?: () => void;
 }
 
-export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
+export function ReaderSidebar({ userEmail, topLabels, onNavigate }: ReaderSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -113,18 +114,19 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
             Curation
           </p>
           <div className="mt-1 space-y-0.5">
-            <Link href="/dashboard/reader" className={navLink(pathname === "/dashboard/reader")}>
+            <Link href="/dashboard/reader" onClick={onNavigate} className={navLink(pathname === "/dashboard/reader")}>
               <Search className="h-4 w-4" />
               Explore
             </Link>
             <Link
               href="/dashboard/reader/archive"
+              onClick={onNavigate}
               className={navLink(pathname === "/dashboard/reader/archive")}
             >
               <Archive className="h-4 w-4" />
               Archive
             </Link>
-            <Link href="/dashboard/reader?read=1" className={navLink(false)}>
+            <Link href="/dashboard/reader?read=1" onClick={onNavigate} className={navLink(false)}>
               <Clock className="h-4 w-4" />
               History
             </Link>
@@ -141,6 +143,7 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
                 <Link
                   key={tag}
                   href={`/dashboard/reader?tag=${encodeURIComponent(tag)}`}
+                  onClick={onNavigate}
                   className={navLink(false)}
                 >
                   <Tag className="h-4 w-4" />
@@ -155,7 +158,7 @@ export function ReaderSidebar({ userEmail, topLabels }: ReaderSidebarProps) {
 
       {/* Footer */}
       <div className="border-t border-border p-2 flex items-center gap-1">
-        <Link href="/dashboard/settings" className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 flex-1">
+        <Link href="/dashboard/settings" onClick={onNavigate} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 flex-1">
           <Settings className="h-4 w-4" />
           Settings
         </Link>

@@ -54,8 +54,8 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
     <div
       role="dialog"
       aria-modal="true"
-      className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col rounded-l-2xl border-l border-border bg-background shadow-2xl ${
-        askOpen ? "max-w-[1100px]" : "max-w-[640px]"
+      className={`fixed inset-y-0 right-0 z-50 flex w-full flex-col sm:rounded-l-2xl sm:border-l border-border bg-background shadow-2xl ${
+        askOpen ? "sm:max-w-[1100px]" : "sm:max-w-[640px]"
       }`}
     >
       {/* Toolbar */}
@@ -106,10 +106,10 @@ export function ReaderDrawer({ post, onClose }: ReaderDrawerProps) {
 
       {askOpen ? (
         <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1 overflow-y-auto border-r border-border px-7 py-2">
+          <div className="hidden sm:block min-w-0 flex-1 overflow-y-auto border-r border-border px-7 py-2">
             <ReaderBody post={displayPost} />
           </div>
-          <div className="flex min-w-0 w-[45%] flex-col">
+          <div className="flex min-w-0 w-full sm:w-[45%] flex-col">
             <AskAIPanel post={post} onClose={() => setAskOpen(false)} />
           </div>
         </div>
